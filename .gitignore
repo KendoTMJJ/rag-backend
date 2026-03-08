@@ -1,0 +1,55 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Variables de entorno (¡nunca subir!)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Archivos temporales
+temp/
+tmp/
+*.tmp
+
+# Modelos de ML descargados (pueden pesar GBs)
+models/
+*.bin
+*.safetensors
+*.onnx
+
+# Base de datos local
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Alembic (solo si no lo usas aún)
+# alembic/versions/

@@ -1,0 +1,19 @@
+# Vatiables de entornno + Orm
+python-dotenv
+sqlalchemy
+
+# Sqlalchemy
+sqlalchemy
+psycopg2-binary
+pgvector
+
+# Embeddings
+langchain-community
+sentence-transformers
+pandas
+openpyxl
+
+#Fastapi
+fastapi
+python-multipart
+uvicorn
