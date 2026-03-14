@@ -24,7 +24,6 @@ tmp/
 *.tmp
 
 # Modelos de ML descargados (pueden pesar GBs)
-models/
 *.bin
 *.safetensors
 *.onnx
