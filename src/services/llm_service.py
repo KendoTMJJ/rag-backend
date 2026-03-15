@@ -64,12 +64,6 @@ def _build_llm(base_url: str, model: str, temperature: float, **extra_kwargs) ->
 
 # ──────────────────────────────────────────────────────────────
 # Store de historial LangChain con TTL
-#
-# NOTA: _HistoryStore gestiona InMemoryChatMessageHistory (objetos LangChain)
-# y no puede unificarse directamente con TTLStore (rag_pipeline.py) porque
-# LangChain requiere devolver el objeto completo de historial, no solo un valor.
-# Son responsabilidades distintas: TTLStore almacena strings/bools de sesión,
-# _HistoryStore almacena el historial de mensajes del LLM.
 # ──────────────────────────────────────────────────────────────
 
 _HISTORY_TTL = int(_os.getenv("SESSION_TTL_SECONDS", 7200))
@@ -131,9 +125,24 @@ class LLMService:
     """
     RAG con memoria por sesión (LangChain RunnableWithMessageHistory).
     Historial con TTL/maxsize alineado al TTLStore del pipeline.
+
+    Timeouts configurables por variables de entorno:
+      GENERATE_TIMEOUT   — generación RAG principal       (default: 120s CPU / 20s GPU)
+      GENERAL_TIMEOUT    — generate_general_controlled     (default: 120s CPU / 20s GPU)
+      CLASSIFIER_TIMEOUT — classify_domain                 (default:  60s CPU / 10s GPU)
+
+    Para producción con GPU, bajar a 20/20/10.
+    Para desarrollo local con CPU, los defaults de 120/120/60 son seguros.
     """
 
     _STOP_TOKENS = ["---", "###", "TU RESPUESTA:"]
+
+    # Timeouts: defaults altos para CPU local.
+    # En producción con GPU setear en .env: GENERATE_TIMEOUT=20, GENERAL_TIMEOUT=20, CLASSIFIER_TIMEOUT=10
+    _GENERATE_TIMEOUT_SECONDS = float(_os.getenv("GENERATE_TIMEOUT", "120.0"))
+    _GENERAL_TIMEOUT_SECONDS = float(_os.getenv("GENERAL_TIMEOUT", "120.0"))
+    _CLASSIFIER_TIMEOUT_SECONDS = float(
+        _os.getenv("CLASSIFIER_TIMEOUT", "60.0"))
 
     def __init__(
         self,
@@ -172,7 +181,13 @@ class LLMService:
         ])
 
         self._get_history = lambda sid: self._store.get_or_create(sid)
-        logger.info(f"✅ LLMService listo: model={self.model}")
+        logger.info(
+            "✅ LLMService listo: model=%s | timeouts: generate=%.0fs general=%.0fs classifier=%.0fs",
+            self.model,
+            self._GENERATE_TIMEOUT_SECONDS,
+            self._GENERAL_TIMEOUT_SECONDS,
+            self._CLASSIFIER_TIMEOUT_SECONDS,
+        )
 
     # ──────────────────────────────────────────────────────────────
     # Construcción de chains
@@ -352,20 +367,9 @@ class LLMService:
         "Responde:"
     )
 
-    _GENERAL_TIMEOUT_SECONDS = float(_os.getenv("GENERAL_TIMEOUT", "12.0"))
-    _CLASSIFIER_TIMEOUT_SECONDS = float(
-        _os.getenv("CLASSIFIER_TIMEOUT", "10.0"))
-
     def classify_domain(self, question: str) -> bool:
         """
         Clasifica si *question* pertenece al dominio académico de posgrados.
-
-        Usa el LLM como clasificador binario directo (sin historial, sin cadena RAG).
-        Patrón idéntico a extract_list_intent_and_filters().
-
-        Returns:
-            True  → pregunta académica, el pipeline continúa.
-            False → fuera de dominio, devolver OUT_OF_DOMAIN.
 
         Fallback (fail-open): si el LLM falla o supera el timeout → True.
         Es preferible permitir ocasionalmente algo off-topic que bloquear
@@ -379,10 +383,10 @@ class LLMService:
 
         llm_bound = self.llm.bind(
             options={
-                "num_predict": 6,    # "ACADEMIC" o "NOT_ACADEMIC" son ≤ 4 tokens
-                "top_k": 1,          # greedy — máximo determinismo
+                "num_predict": 6,
+                "top_k": 1,
                 "top_p": 1.0,
-                "temperature": 0.0,  # clasificación, no generación creativa
+                "temperature": 0.0,
             },
             stop=["\n", "---", " "],
         )
@@ -406,7 +410,7 @@ class LLMService:
 
             if t.is_alive():
                 logger.warning(
-                    "[classify_domain] LLM timeout (%.1fs). Fail-open.",
+                    "[classify_domain] LLM timeout (%.0fs). Fail-open.",
                     self._CLASSIFIER_TIMEOUT_SECONDS,
                 )
                 return True
@@ -433,8 +437,6 @@ class LLMService:
     # ──────────────────────────────────────────────────────────────
     # Generate — RAG principal
     # ──────────────────────────────────────────────────────────────
-
-    _GENERATE_TIMEOUT_SECONDS = float(_os.getenv("GENERATE_TIMEOUT", "15.0"))
 
     def generate(
         self,
@@ -481,7 +483,7 @@ class LLMService:
 
             if t.is_alive():
                 logger.warning(
-                    "[LLMService.generate] Timeout (%.1fs). Fallback.",
+                    "[LLMService.generate] Timeout (%.0fs). Fallback.",
                     self._GENERATE_TIMEOUT_SECONDS,
                 )
                 return (
@@ -544,7 +546,7 @@ class LLMService:
 
             if t.is_alive():
                 logger.warning(
-                    "[LLMService.generate_general_controlled] Timeout (%.1fs). Fallback breve.",
+                    "[LLMService.generate_general_controlled] Timeout (%.0fs). Fallback breve.",
                     self._GENERAL_TIMEOUT_SECONDS,
                 )
                 return (
