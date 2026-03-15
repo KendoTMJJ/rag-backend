@@ -10,8 +10,6 @@ from src.nlp.text_normalizer import normalize_and_fix
 
 _OVERVIEW_TRIGGERS = {
     "que me dices", "que me puede decir", "que me puedes decir",
-    # FIX: "puedes decirme" y "puede decirme" se mantienen pero
-    # looks_like_program_overview() los filtra si hay indicadores de listado
     "puedes decirme", "puede decirme",
     "de que trata", "de que se trata",
     "describeme", "descripcion",
@@ -27,8 +25,6 @@ _OVERVIEW_TRIGGERS = {
     "cuentame del programa", "presentame el programa",
 }
 
-# FIX: Patrones que indican que la pregunta es un LISTADO aunque contenga
-# un trigger de overview. Ej: "puedes decirme QUÉ PROGRAMAS hay de salud"
 _LISTING_QUALIFIERS = [
     r"\bque\s+programas\b",
     r"\bcuales?\s+programas\b",
@@ -38,9 +34,6 @@ _LISTING_QUALIFIERS = [
     r"\bprogramas\s+(del?|de\s+la)\s+area\b",
 ]
 
-# FIX: Palabras que indican pregunta TABULAR aunque contenga un trigger de overview.
-# Ej: "puedes decirme el pensum" → CURRICULUM, no OVERVIEW
-# Ej: "puedes decirme la malla curricular" → CURRICULUM, no OVERVIEW
 _TABULAR_QUALIFIERS = [
     "malla", "pensum", "plan de estudios",
     "asignaturas", "materias", "electiv", "optativas",
@@ -71,7 +64,6 @@ _FALSE_LISTING_PHRASES = [
     "tiene laboratorio", "tiene sede", "cuantos estudiantes",
 ]
 
-# Stopwords que no son topics válidos para extract_topic_for_listing
 _TOPIC_STOPWORDS = frozenset({
     "los", "las", "el", "la", "un", "una", "unos", "unas",
     "que", "de", "del", "en", "al", "a", "y", "o", "con",
@@ -102,22 +94,16 @@ def looks_like_programs_listing(q_norm: str) -> bool:
     if not q:
         return False
 
-    # Guardia 1: trigger de overview Y sin indicadores de listado → NO es listado
-    # FIX: solo bloquear si el trigger de overview no va acompañado de
-    # "que programas", "cuales programas", etc.
     if any(t in q for t in _OVERVIEW_TRIGGERS):
         if not any(re.search(lq, q) for lq in _LISTING_QUALIFIERS):
             return False
 
-    # Guardia 2: razonamiento/comparación → NO es listado
     if is_reasoning_question(q):
         return False
 
-    # Guardia 3: atributo singular de un programa → NO es listado
     if is_false_listing(q):
         return False
 
-    # Caso A: palabra de programa + verbo de existencia/listado
     if looks_like_program_word(q):
         if re.search(
             r"\b(que|hay|existe|existen|ofrecen|ofrece|tienen|tiene|algun|alguna|alguno)\b", q
@@ -126,7 +112,6 @@ def looks_like_programs_listing(q_norm: str) -> bool:
                 return False
             return True
 
-    # Caso B: búsqueda por área temática
     if looks_like_program_word(q):
         if re.search(
             r"\b(relacionad[oa]s?\s+con|del?\s+area\s+de"
@@ -149,20 +134,15 @@ def looks_like_program_overview(q_norm: str) -> bool:
     if not q:
         return False
 
-    # Si hay indicadores de listado → NO es overview
     if any(re.search(lq, q) for lq in _LISTING_QUALIFIERS):
         return False
 
-    # Si hay intención tabular → NO es overview
     if any(w in q for w in _TABULAR_QUALIFIERS):
         return False
 
-    # Si parece listado → NO es overview
     if looks_like_programs_listing(q):
         return False
 
-    # FIX CLAVE: si hay campo exacto detectado, NO es overview
-    # Ej: "puedes decirme cuánto cuesta..." debe ir a PROGRAM_FIELD
     if detect_field(q) is not None:
         return False
 
@@ -261,32 +241,18 @@ def extract_topic_for_listing(question: str) -> Optional[str]:
     if not qn:
         return None
     if any(t in qn for t in _OVERVIEW_TRIGGERS):
-        # FIX: si hay trigger de overview pero también indicadores de listado,
-        # sí extraer el topic (ej: "puedes decirme qué programas hay de salud")
         if not any(re.search(lq, qn) for lq in _LISTING_QUALIFIERS):
             return None
     if is_reasoning_question(qn):
         return None
 
-    # FIX: patrones ordenados de mayor a menor especificidad.
-    # Los patrones más específicos van primero para evitar que
-    # r"\bde\s+(.+)$" capture demasiado ("de los programas que...")
     patterns = [
-        # "que tienen que ver con salud"
         r"\bque\s+tienen\s+que\s+ver\s+con\s+(.+)$",
-        # "relacionados con educacion"
         r"\brelacionad[oa]s?\s+con\s+(.+)$",
-        # "vinculados con derecho"
         r"\bvinculad[oa]s?\s+con\s+(.+)$",
-        # "del area de salud"
         r"\bdel?\s+area\s+de\s+(.+)$",
-        # "en el area de sistemas"
         r"\ben\s+el\s+area\s+de\s+(.+)$",
-        # "sobre psicologia"
         r"\bsobre\s+(.+)$",
-        # FIX: "de" solo si NO sigue artículo+palabraPrograma
-        # Antes: r"\bde\s+(.+)$" capturaba "de los programas que tienen que ver con salud"
-        # → después de splits quedaba "los"
         r"\bde\s+(?!(?:los?|las?|un[oa]?)\s+(?:programas?|posgrados?|maestrias?|especializ\w*|doctorad\w*))\s*(.+)$",
         r"\ben\s+(.+)$",
     ]
@@ -296,21 +262,19 @@ def extract_topic_for_listing(question: str) -> Optional[str]:
         if not m:
             continue
         topic = m.group(1).strip()
-        # Cortar en verbos de existencia
+        # FIX G1: agregar "recomiendan/sugieren" al split de verbos
         topic = re.split(
-            r"\b(hay|existe|existen|ofrece|ofrecen|tiene|tienen|son|estan)\b",
+            r"\b(hay|existe|existen|ofrece|ofrecen|tiene|tienen|son|estan"
+            r"|recomiendan|recomienda|sugieren|sugiere|conviene|convendria)\b",
             topic, maxsplit=1, flags=re.IGNORECASE,
         )[0].strip()
-        # Cortar en palabras de programa
         topic = re.split(
             r"\b(posgrados?|programas?|maestrias?|especializ\w*|doctorad\w*)\b",
             topic, maxsplit=1, flags=re.IGNORECASE,
         )[0].strip()
-        # Limpiar puntuación final y espacios
         topic = re.sub(r"[?.!,;]+$", "", topic).strip()
         topic = re.sub(r"\s+", " ", topic).strip()
 
-        # Rechazar si el topic es solo stopwords (ej: "los", "el", "de")
         words = topic.lower().split()
         if not words or all(w in _TOPIC_STOPWORDS for w in words):
             continue
@@ -324,7 +288,6 @@ def extract_topic_for_listing(question: str) -> Optional[str]:
 # Campo exacto
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Patrones de "donde" que NO son preguntas de ubicación del programa
 _DONDE_EXCLUSION_RE = [
     re.compile(p, re.IGNORECASE) for p in [
         r"\bdonde\s+(\w+\s+)?(puedo|puede|podria|podemos|pueden)\s+\w*\s*(trabajar|inscribir\w*|estudiar|conseguir|obtener|ver|encontrar|aplicar|registrar\w*)\b",
@@ -367,6 +330,9 @@ def detect_field(q_norm: str) -> Optional[str]:
         return "duration"
     if re.search(r"\bcuanto\s+tiempo\b", q):
         return "duration"
+    # FIX D7: "qué tan largo es" → duration
+    if re.search(r"\btan\s+largo\b", q):
+        return "duration"
 
     # ── CREDITS ──────────────────────────────────────────────────────────────
     if re.search(r"\bcreditos?\b", q):
@@ -376,12 +342,12 @@ def detect_field(q_norm: str) -> Optional[str]:
     if re.search(r"\bvale\s+la\s+pena\b", q):
         return None
 
-    # NUEVO: excluir contextos financieros fuera de dominio
     if re.search(r"\b(dolar|euro|divisa|bolsa|accion|cotizacion|tasa de cambio|peso|libra)\b", q):
         return None
 
     if re.search(r"\b(costo|cuesta|precio|valor|vale|inversion|matricula|pagar|pago)\b", q):
         return "cost"
+    # FIX D8: "es caro" → cost
     if re.search(r"\b(caro|cara|barato|barata|economico|economica|costoso|costosa)\b", q):
         return "cost"
     if re.search(r"\bfinanciacion\b", q):
@@ -394,7 +360,6 @@ def detect_field(q_norm: str) -> Optional[str]:
         return "modality"
 
     # ── LOCATION ─────────────────────────────────────────────────────────────
-    # Excluir "donde puedo trabajar/inscribir/etc." que no son preguntas de sede
     if any(exc.search(q) for exc in _DONDE_EXCLUSION_RE):
         pass
     elif re.search(r"\b(ubicacion|ubicado|ubicada|sede|campus|ciudad)\b", q):
@@ -431,8 +396,10 @@ def detect_field(q_norm: str) -> Optional[str]:
         return "year_update"
 
     # ── DIVISION ─────────────────────────────────────────────────────────────
+    # FIX A8/C10: "a qué división pertenece" debe retornar "division"
+    # Se eliminan "a\s+que" y "pertenece" de la lista de exclusión
     if re.search(r"\bdivision\b", q) and not re.search(
-        r"\b(en\s+general|a\s+que|que\s+division|pertenece|facultad)\b", q
+        r"\b(en\s+general|que\s+division|facultad)\b", q
     ):
         return "division"
 

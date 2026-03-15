@@ -22,4 +22,4 @@ def api_url() -> str:
 
 @pytest.fixture(scope="session")
 def cases() -> list[dict]:
-    return _load_cases("cases_sin_contexto.json")
+    return _load_cases("casos.json")

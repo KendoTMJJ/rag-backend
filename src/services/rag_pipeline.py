@@ -28,7 +28,6 @@ from src.nlp.intent_utils import (
 
 from src.nlp.input_sanitizer import sanitize
 from src.nlp.domain_guardrail import check_domain
-from src.nlp.domain_taxonomy import score_domain
 from src.quality.context_reranker import rerank_top
 from src.quality.output_validator import validate_output, CONFIDENCE_SHOW, CONFIDENCE_BLOCK
 from src.services.retrieval_service import PROGRAM_RESOLVE_MIN_SIM
@@ -73,7 +72,6 @@ class RequestAnalysis:
     gate_should_block: bool = False
     gate_reason: str = ""
 
-    # Score continuo del scorer de dominio
     guard_confidence: float = 0.0
     guard_category: str = "unknown"
 
@@ -92,6 +90,60 @@ _OUT_OF_DOMAIN_MSG = (
     "de la Universidad Santo Tomás Seccional Tunja. "
     "¿Hay algo sobre nuestros programas en lo que pueda ayudarte?"
 )
+
+# FIX D15/G3: keywords que bypasean el clasificador LLM porque son
+# claramente relacionadas con posgrados aunque la frase sea ambigua
+_ACADEMIC_BYPASS_KEYWORDS = frozenset({
+    "posgrado", "posgrados", "maestria", "maestrias", "especializacion",
+    "especializaciones", "doctorado", "doctorados", "especializarme",
+    "postgrado", "postgrados",
+})
+
+# Sustantivos claramente fuera del dominio académico.
+# Si aparecen en la pregunta, el clasificador SIEMPRE corre —
+# incluso con sesión activa — para evitar que la memoria del programa
+# responda preguntas como "y cuánto cuesta un pollo".
+_OFFDOMAIN_NOUNS = frozenset({
+    # Comida / animales
+    "pollo", "pizza", "hamburguesa", "empanada", "arepa", "perro", "gato",
+    "cerdo", "res", "vaca", "pez", "pescado", "arroz", "sopa", "carne",
+    "fruta", "verdura", "bebida", "cerveza", "vino", "cafe", "jugo",
+    # Personas / familia
+    "hijo", "hija", "bebe", "nino", "nina", "esposa", "esposo",
+    "mama", "papa", "abuelo", "abuela", "embarazo", "parto",
+    # Entretenimiento / tecnología cotidiana
+    "pelicula", "serie", "cancion", "album", "concierto", "videojuego",
+    "netflix", "spotify", "youtube", "instagram", "tiktok",
+    "celular", "telefono", "carro", "moto", "bicicleta", "bus",
+    # Finanzas personales no académicas
+    "bitcoin", "crypto", "dolar", "euro", "forex", "accion", "nft",
+    # Otros claramente OOD
+    "vacuna", "medicamento", "enfermedad", "receta", "restaurante",
+    "hotel", "viaje", "vuelo", "pasaporte", "visa",
+})
+
+# Sustantivos claramente fuera del dominio académico.
+# Si aparecen en la pregunta, el clasificador SIEMPRE corre —
+# incluso con sesión activa — para evitar que la memoria del programa
+# responda preguntas como "y cuánto cuesta un pollo".
+_OFFDOMAIN_NOUNS = frozenset({
+    # Comida / animales
+    "pollo", "pizza", "hamburguesa", "empanada", "arepa", "perro", "gato",
+    "cerdo", "res", "vaca", "pez", "pescado", "arroz", "sopa", "carne",
+    "fruta", "verdura", "bebida", "cerveza", "vino", "cafe", "jugo",
+    # Personas / familia
+    "hijo", "hija", "bebe", "nino", "nina", "esposa", "esposo",
+    "mama", "papa", "abuelo", "abuela", "embarazo", "parto",
+    # Entretenimiento / tecnología cotidiana
+    "pelicula", "serie", "cancion", "album", "concierto", "videojuego",
+    "netflix", "spotify", "youtube", "instagram", "tiktok",
+    "celular", "telefono", "carro", "moto", "bicicleta", "bus",
+    # Finanzas personales no académicas
+    "bitcoin", "crypto", "dolar", "euro", "forex", "accion", "nft",
+    # Otros claramente OOD
+    "vacuna", "medicamento", "enfermedad", "receta", "restaurante",
+    "hotel", "viaje", "vuelo", "pasaporte", "visa",
+})
 
 V = TypeVar("V")
 
@@ -254,8 +306,11 @@ class RAGPipeline:
             or ("que perfil" in q and ("entrar" in q or "ingresar" in q))
             or any(k in q for k in [
                 "tipo de estudiante", "buscan", "busca el programa",
-                "quien puede entrar", "que tipo de profesional",
+                "quien puede entrar", "quien puede ingresar",  # FIX C16
+                "que tipo de profesional",
                 "requisito para ser admitido",
+                "que necesito para entrar", "que se necesita para ingresar",  # FIX D10
+                "necesito para entrar", "necesito para ingresar",
             ])
         ):
             return "admission_profile"
@@ -266,6 +321,8 @@ class RAGPipeline:
         if any(k in q for k in [
             "competencias", "habilidades al salir", "que aprendo", "que aprende",
             "enfoque del programa", "que se estudia", "perfil de egreso", "perfil egreso",
+            "habilidades adquiero", "habilidades que adquiero",  # FIX C17
+            "que habilidades", "habilidades obtengo", "habilidades desarrollo",
         ]):
             return "graduated_profile"
 
@@ -280,6 +337,8 @@ class RAGPipeline:
             "mercado laboral", "oportunidades laborales",
             "al salir en que puedo trabajar", "al salir donde puedo trabajar",
             "al egresar en que puedo trabajar", "salidas laborales",
+            "conseguir trabajo", "para conseguir trabajo",  # FIX D15
+            "sirve para trabajar", "sirve para conseguir",
         ]):
             return "occupational_profile"
 
@@ -385,14 +444,37 @@ class RAGPipeline:
         q_norm: str,
         chat_session_id: str,
         has_structured_academic_intent: bool,
+        field: Optional[str],
     ) -> bool:
         active_for_clf = self._get_active_snies(chat_session_id)
         q_tokens = q_norm.split()
 
+        # Si la pregunta contiene keywords académicos claros → nunca clasificar
+        has_academic_bypass = any(
+            w in q_norm for w in _ACADEMIC_BYPASS_KEYWORDS)
+
+        # FIX "y cuánto cuesta un pollo":
+        # Si la pregunta contiene un sustantivo claramente off-domain,
+        # SIEMPRE correr el clasificador — incluso con sesión activa.
+        # Evita que la memoria del programa responda preguntas trampa.
+        has_offdomain_noun = any(noun in q_norm for noun in _OFFDOMAIN_NOUNS)
+        if has_offdomain_noun and not has_academic_bypass:
+            return True  # forzar clasificador sin importar sesión
+
+        # Si hay campo detectado pero sin sesión activa y sin contexto académico,
+        # también correr clasificador (fix I1/I2/I6)
+        field_without_academic_context = (
+            field is not None
+            and not active_for_clf
+            and not has_academic_bypass
+            and not self.has_program_mention(q_norm)
+        )
+
         skip_clf = (
             len(q_tokens) <= 1
             or (active_for_clf and len(q_tokens) <= 5)
-            or has_structured_academic_intent
+            or has_academic_bypass
+            or (has_structured_academic_intent and not field_without_academic_context)
         )
         return not skip_clf
 
@@ -438,7 +520,7 @@ class RAGPipeline:
             return True
 
         tokens = q.split()
-        if len(tokens) <= 5 and any([
+        if len(tokens) <= 7 and any([
             field is not None,
             narrative_field is not None,
             is_overview,
@@ -583,7 +665,6 @@ class RAGPipeline:
             is_listing and field is None) else None
 
         guard = check_domain(q_norm)
-        domain_score = score_domain(q_norm)
 
         has_structured_academic_intent = any([
             field is not None,
@@ -595,13 +676,14 @@ class RAGPipeline:
             asks_inscription,
             is_listing,
             is_general,
-            domain_score.confidence >= 0.50,
         ])
 
+        # FIX I1/I2/I4/I5/I6: pasar field a _should_run_classifier
         should_run_classifier = self._should_run_classifier(
             q_norm=q_norm,
             chat_session_id=chat_session_id,
             has_structured_academic_intent=has_structured_academic_intent,
+            field=field,
         )
 
         has_program_reference = self.has_program_mention(question)
@@ -641,8 +723,6 @@ class RAGPipeline:
             should_run_classifier=should_run_classifier,
             has_program_reference=has_program_reference,
             can_use_memory_for_program_resolution=can_use_memory_for_program_resolution,
-            guard_confidence=domain_score.confidence,
-            guard_category=domain_score.category,
         )
 
     # ─────────────────────────────────────────
@@ -668,6 +748,18 @@ class RAGPipeline:
                     "answer": "Por favor escribe tu pregunta.", "resolved": False}},
             )
 
+        # Atajos triviales — antes de cualquier análisis semántico
+        greetings = {"hola", "buenas", "hey", "hi", "buenos dias",
+                     "buenas tardes", "buenas noches", "que tal"}
+        if q_norm in greetings:
+            return self._return_no_llm(chat_session_id, question,
+                                       {"route": "GREETING", "data": {"resolved": True}})
+
+        # FIX H3: "gracias por la información" → THANKS (match por prefijo)
+        if q_norm in {"gracias", "muchas gracias", "thanks"} or q_norm.startswith("gracias"):
+            return self._return_no_llm(chat_session_id, question,
+                                       {"route": "THANKS", "data": {"resolved": True}})
+
         analysis = self._analyze_request(question, q_norm, chat_session_id)
         semester = analysis.semester
 
@@ -686,35 +778,6 @@ class RAGPipeline:
                     "resolved": False,
                 }},
             )
-
-        # Zona gris: confianza muy baja y sin intención estructural → rechaza antes del LLM
-        if (
-            analysis.guard_reason == "unknown"
-            and analysis.guard_confidence < 0.15
-            and not analysis.has_structured_academic_intent
-        ):
-            logger.info(
-                "[GUARDRAIL] low-confidence unknown. confidence=%.2f session=%s q=%r",
-                analysis.guard_confidence, chat_session_id, question[:60],
-            )
-            return self._return_no_llm(
-                chat_session_id,
-                question,
-                {"route": "OUT_OF_DOMAIN", "data": {
-                    "answer": _OUT_OF_DOMAIN_MSG,
-                    "reason": "low_confidence",
-                    "resolved": False,
-                }},
-            )
-
-        greetings = {"hola", "buenas", "hey", "hi", "buenos dias",
-                     "buenas tardes", "buenas noches", "que tal"}
-        if q_norm in greetings:
-            return self._return_no_llm(chat_session_id, question,
-                                       {"route": "GREETING", "data": {"resolved": True}})
-        if q_norm in {"gracias", "muchas gracias", "thanks"}:
-            return self._return_no_llm(chat_session_id, question,
-                                       {"route": "THANKS", "data": {"resolved": True}})
 
         bare_snies = re.fullmatch(r"snies\s+(\d{5,10})", q_norm)
         if bare_snies:
@@ -776,9 +839,8 @@ class RAGPipeline:
         if analysis.should_run_classifier:
             if not self.llm.classify_domain(question):
                 logger.info(
-                    "[CLASSIFIER] NOT_ACADEMIC. session=%s q=%r confidence=%.2f category=%s",
+                    "[CLASSIFIER] NOT_ACADEMIC. session=%s q=%r",
                     chat_session_id, question[:60],
-                    analysis.guard_confidence, analysis.guard_category,
                 )
                 return self._return_no_llm(
                     chat_session_id,
@@ -786,34 +848,6 @@ class RAGPipeline:
                     {"route": "OUT_OF_DOMAIN", "data": {
                         "answer": _OUT_OF_DOMAIN_MSG,
                         "reason": "classifier",
-                        "resolved": False,
-                    }},
-                )
-
-        # ── RETRIEVAL DOMAIN GATE ──────────────────────────────────────────
-        # El índice de embeddings es el juez final de dominio.
-        # Se salta si hay sesión activa, intención estructural clara,
-        # o el scorer ya tiene confianza alta.
-        _active_for_gate = self._get_active_snies(chat_session_id)
-        _skip_gate = (
-            (bool(_active_for_gate) and not analysis.is_global_comparison)
-            or analysis.has_structured_academic_intent
-            or analysis.guard_confidence >= 0.50
-        )
-        if not _skip_gate:
-            _in_domain, _best_sim = self.vector.is_in_domain(question)
-            if not _in_domain:
-                logger.info(
-                    "[RETRIEVAL_GATE] out-of-domain. best_sim=%.3f session=%s q=%r",
-                    _best_sim, chat_session_id, question[:60],
-                )
-                return self._return_no_llm(
-                    chat_session_id,
-                    question,
-                    {"route": "OUT_OF_DOMAIN", "data": {
-                        "answer": _OUT_OF_DOMAIN_MSG,
-                        "reason": "retrieval_gate",
-                        "best_similarity": _best_sim,
                         "resolved": False,
                     }},
                 )

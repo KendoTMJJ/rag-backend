@@ -1,143 +1,143 @@
 [
   {
-    "name": "A1 — Selección por SNIES 108827",
-    "session": "blk-a-108827",
-    "question": "snies 108827",
+    "name": "A1 — Selección por SNIES 110001",
+    "session": "blk-a-110001",
+    "question": "snies 110001",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }
   },
   {
-    "name": "A2 — Duración tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A2 — Duración tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Cuánto dura?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A3 — Créditos tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A3 — Créditos tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Cuántos créditos tiene?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A4 — Costo tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A4 — Costo tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Cuánto cuesta el semestre?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A5 — Modalidad tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A5 — Modalidad tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Es presencial o virtual?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A6 — Sede tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A6 — Sede tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Dónde queda la sede?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A7 — Título tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A7 — Título tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Qué título otorga?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A8 — División tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A8 — División tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "A qué división pertenece?",
     "expectAny": {
-      "route": ["PROGRAM_FIELD", "NOT_FOUND"]
+      "route": ["PROGRAM_FIELD", "GENERAL_CONTROLLED", "NOT_FOUND"]
     }
   },
   {
-    "name": "A9 — Horario tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A9 — Horario tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Cuáles son los horarios?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A10 — Malla tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A10 — Malla tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Dame el pensum completo",
     "expectAny": {
       "route": ["CURRICULUM", "NOT_FOUND"]
     }
   },
   {
-    "name": "A11 — Semestre específico tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A11 — Semestre específico tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Qué materias hay en el semestre 1?",
     "expectAny": {
       "route": ["CURRICULUM_SEMESTER", "CURRICULUM", "NOT_FOUND"]
     }
   },
   {
-    "name": "A12 — Electivas tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A12 — Electivas tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Hay materias electivas?",
     "expectAny": {
       "route": ["ELECTIVES", "NOT_FOUND"]
     }
   },
   {
-    "name": "A13 — Opciones de grado tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A13 — Opciones de grado tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Cómo me puedo graduar?",
     "expectAny": {
       "route": ["DEGREE_OPTIONS", "NOT_FOUND"]
     }
   },
   {
-    "name": "A14 — Perfil de ingreso tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A14 — Perfil de ingreso tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Cuál es el perfil de ingreso?",
     "expectAny": {
       "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
-    "name": "A15 — Perfil de egreso tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A15 — Perfil de egreso tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Qué competencias adquiero al graduarme?",
     "expectAny": {
       "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
-    "name": "A16 — Perfil ocupacional tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A16 — Perfil ocupacional tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "En qué puedo trabajar al graduarme?",
     "expectAny": {
       "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
-    "name": "A17 — Diferencial tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A17 — Diferencial tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Qué hace diferente a este programa?",
     "expectAny": {
       "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
-    "name": "A18 — Inscripción tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A18 — Inscripción tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Cómo me inscribo?",
     "expectAny": {
       "route": [
@@ -148,233 +148,233 @@
     }
   },
   {
-    "name": "A19 — Overview tras SNIES 108827",
-    "session": "blk-a-108827",
+    "name": "A19 — Overview tras SNIES 110001",
+    "session": "blk-a-110001",
     "question": "Dame un resumen del programa",
     "expectAny": {
       "route": ["PROGRAM_OVERVIEW", "PROGRAM_OVERVIEW_NOT_FOUND"]
     }
   },
   {
-    "name": "A20 — Selección por SNIES 116978",
-    "session": "blk-a-116978",
-    "question": "snies 116978",
+    "name": "A20 — Selección por SNIES 110007",
+    "session": "blk-a-110007",
+    "question": "snies 110007",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }
   },
   {
-    "name": "A21 — Duración tras SNIES 116978",
-    "session": "blk-a-116978",
+    "name": "A21 — Duración tras SNIES 110007",
+    "session": "blk-a-110007",
     "question": "Cuántos semestres dura?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A22 — Costo tras SNIES 116978",
-    "session": "blk-a-116978",
+    "name": "A22 — Costo tras SNIES 110007",
+    "session": "blk-a-110007",
     "question": "Cuánto vale el semestre?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A23 — Malla tras SNIES 116978",
-    "session": "blk-a-116978",
+    "name": "A23 — Malla tras SNIES 110007",
+    "session": "blk-a-110007",
     "question": "Puedes mostrarme la malla curricular?",
     "expectAny": {
       "route": ["CURRICULUM", "NOT_FOUND"]
     }
   },
   {
-    "name": "A24 — Perfil profesional tras SNIES 116978",
-    "session": "blk-a-116978",
+    "name": "A24 — Perfil profesional tras SNIES 110007",
+    "session": "blk-a-110007",
     "question": "Cuál es el perfil profesional del egresado?",
     "expectAny": {
       "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
-    "name": "A25 — Campo laboral tras SNIES 116978",
-    "session": "blk-a-116978",
+    "name": "A25 — Campo laboral tras SNIES 110007",
+    "session": "blk-a-110007",
     "question": "Cuál es el campo laboral?",
     "expectAny": {
       "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
-    "name": "A26 — Selección por SNIES 117903",
-    "session": "blk-a-117903",
-    "question": "snies 117903",
+    "name": "A26 — Selección por SNIES 110004",
+    "session": "blk-a-110004",
+    "question": "snies 110004",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }
   },
   {
-    "name": "A27 — Créditos tras SNIES 117903",
-    "session": "blk-a-117903",
+    "name": "A27 — Créditos tras SNIES 110004",
+    "session": "blk-a-110004",
     "question": "Cuántos créditos tiene el programa?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A28 — Modalidad tras SNIES 117903",
-    "session": "blk-a-117903",
+    "name": "A28 — Modalidad tras SNIES 110004",
+    "session": "blk-a-110004",
     "question": "La maestría es presencial?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "A29 — Pensum tras SNIES 117903",
-    "session": "blk-a-117903",
+    "name": "A29 — Pensum tras SNIES 110004",
+    "session": "blk-a-110004",
     "question": "Puedes decirme el pensum?",
     "expectAny": {
       "route": ["CURRICULUM", "NOT_FOUND"]
     }
   },
   {
-    "name": "A30 — Plan de estudios semestre 2 tras SNIES 117903",
-    "session": "blk-a-117903",
+    "name": "A30 — Plan de estudios semestre 2 tras SNIES 110004",
+    "session": "blk-a-110004",
     "question": "Qué se ve en el segundo semestre?",
     "expectAny": {
       "route": ["CURRICULUM_SEMESTER", "CURRICULUM", "NOT_FOUND"]
     }
   },
   {
-    "name": "B1 — Selección por nombre 108827",
-    "session": "blk-b-108827",
+    "name": "B1 — Selección por nombre 110001",
+    "session": "blk-b-110001",
     "question": "Especialización en Auditoría y Aseguramiento de la Información",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }
   },
   {
-    "name": "B2 — Costo tras nombre 108827",
-    "session": "blk-b-108827",
+    "name": "B2 — Costo tras nombre 110001",
+    "session": "blk-b-110001",
     "question": "Cuánto cuesta la especialización?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "B3 — Duración tras nombre 108827",
-    "session": "blk-b-108827",
+    "name": "B3 — Duración tras nombre 110001",
+    "session": "blk-b-110001",
     "question": "Cuánto tiempo dura?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "B4 — Horario tras nombre 108827",
-    "session": "blk-b-108827",
+    "name": "B4 — Horario tras nombre 110001",
+    "session": "blk-b-110001",
     "question": "Qué horarios maneja?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "B5 — Malla curricular tras nombre 108827",
-    "session": "blk-b-108827",
+    "name": "B5 — Malla curricular tras nombre 110001",
+    "session": "blk-b-110001",
     "question": "Dame la malla curricular",
     "expectAny": {
       "route": ["CURRICULUM", "NOT_FOUND"]
     }
   },
   {
-    "name": "B6 — Electivas tras nombre 108827",
-    "session": "blk-b-108827",
+    "name": "B6 — Electivas tras nombre 110001",
+    "session": "blk-b-110001",
     "question": "Cuáles son las materias optativas?",
     "expectAny": {
       "route": ["ELECTIVES", "NOT_FOUND"]
     }
   },
   {
-    "name": "B7 — Perfil egreso tras nombre 108827",
-    "session": "blk-b-108827",
+    "name": "B7 — Perfil egreso tras nombre 110001",
+    "session": "blk-b-110001",
     "question": "Cuál es el perfil de egreso?",
     "expectAny": {
       "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
-    "name": "B8 — Perfil ingreso tras nombre 108827",
-    "session": "blk-b-108827",
+    "name": "B8 — Perfil ingreso tras nombre 110001",
+    "session": "blk-b-110001",
     "question": "Qué tipo de profesional puede ingresar?",
     "expectAny": {
       "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
-    "name": "B9 — Diferencial tras nombre 108827",
-    "session": "blk-b-108827",
+    "name": "B9 — Diferencial tras nombre 110001",
+    "session": "blk-b-110001",
     "question": "Por qué estudiar en este programa?",
     "expectAny": {
       "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
-    "name": "B10 — Selección por nombre 116978",
-    "session": "blk-b-116978",
-    "question": "Doctorado en Pedagogía y Neurociencia Aplicada a la Educación",
+    "name": "B10 — Selección por nombre 110007",
+    "session": "blk-b-110007",
+    "question": "Doctorado en Bioética y Humanidades Médicas",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }
   },
   {
-    "name": "B11 — Costo tras nombre 116978",
-    "session": "blk-b-116978",
+    "name": "B11 — Costo tras nombre 110007",
+    "session": "blk-b-110007",
     "question": "Cuál es la inversión por semestre?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "B12 — Créditos tras nombre 116978",
-    "session": "blk-b-116978",
+    "name": "B12 — Créditos tras nombre 110007",
+    "session": "blk-b-110007",
     "question": "Cuántos créditos académicos tiene?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "B13 — Overview tras nombre 116978",
-    "session": "blk-b-116978",
+    "name": "B13 — Overview tras nombre 110007",
+    "session": "blk-b-110007",
     "question": "Cuéntame de qué trata el doctorado",
     "expectAny": {
       "route": ["PROGRAM_OVERVIEW", "PROGRAM_OVERVIEW_NOT_FOUND"]
     }
   },
   {
-    "name": "B14 — Selección por nombre 117903",
-    "session": "blk-b-117903",
+    "name": "B14 — Selección por nombre 110004",
+    "session": "blk-b-110004",
     "question": "Maestría en Marketing Internacional y Negocios",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }
   },
   {
-    "name": "B15 — Sede tras nombre 117903",
-    "session": "blk-b-117903",
+    "name": "B15 — Sede tras nombre 110004",
+    "session": "blk-b-110004",
     "question": "Dónde se dicta la maestría?",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "NOT_FOUND"]
     }
   },
   {
-    "name": "B16 — Opciones de grado tras nombre 117903",
-    "session": "blk-b-117903",
+    "name": "B16 — Opciones de grado tras nombre 110004",
+    "session": "blk-b-110004",
     "question": "Cuáles son las opciones de grado?",
     "expectAny": {
       "route": ["DEGREE_OPTIONS", "NOT_FOUND"]
     }
   },
   {
-    "name": "C1 — Setup sesión larga 108827",
+    "name": "C1 — Setup sesión larga 110001",
     "session": "blk-c-mem",
-    "question": "snies 108827",
+    "question": "snies 110001",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }
@@ -550,7 +550,7 @@
   {
     "name": "C22 — Cambio de programa en memoria",
     "session": "blk-c-mem",
-    "question": "snies 117903",
+    "question": "snies 110004",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }
@@ -604,9 +604,9 @@
     }
   },
   {
-    "name": "D1 — Setup confusión 108827",
+    "name": "D1 — Setup confusión 110001",
     "session": "blk-d-confuse",
-    "question": "snies 108827",
+    "question": "snies 110001",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }
@@ -744,7 +744,7 @@
   {
     "name": "E2 — Resolución pendiente con SNIES",
     "session": "blk-e-pending-1",
-    "question": "snies 108827",
+    "question": "snies 110001",
     "expectAny": {
       "route": ["PROGRAM_FIELD", "PROGRAM_SELECTED", "NOT_FOUND"]
     }
@@ -776,7 +776,7 @@
   {
     "name": "E6 — Resolución pendiente curricular con SNIES",
     "session": "blk-e-pending-3",
-    "question": "snies 117903",
+    "question": "snies 110004",
     "expectAny": {
       "route": ["CURRICULUM", "PROGRAM_SELECTED", "NOT_FOUND"]
     }
@@ -939,7 +939,7 @@
   {
     "name": "I3 — OOD: con sesión activa (el más importante)",
     "session": "blk-i-ood-3",
-    "question": "snies 108827",
+    "question": "snies 110001",
     "expect": {
       "route": "PROGRAM_SELECTED"
     }

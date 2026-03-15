@@ -3,6 +3,9 @@
 venv/
 env/
 
+prueba.py
+
+
 # Variables de entorno (¡nunca subir!)
 .env
 .env.*

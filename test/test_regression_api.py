@@ -10,7 +10,7 @@ import requests
 
 
 def load_cases() -> List[dict]:
-    cases_path = Path(__file__).parent / "cases_sin_contexto.json"
+    cases_path = Path(__file__).parent / "casos.json"
     with cases_path.open("r", encoding="utf-8") as f:
         data = json.load(f)
     if not isinstance(data, list):
