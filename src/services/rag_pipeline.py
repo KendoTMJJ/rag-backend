@@ -605,7 +605,7 @@ class RAGPipeline:
             self._clear_pending_field(chat_session_id)
             if ans:
                 return {"route": "PROGRAM_FIELD", "data": {"snies": snies, "source": "title_select", "field": pending_field, "text": ans, "resolved": True}}
-            return {"route": "NOT_FOUND", "data": {"message": "Identifiqué el programa, pero no tengo ese dato cargado.", "resolved": False}}
+            return {"route": "NOT_FOUND", "data": {"message": "Identifiqué el programa, pero no tengo ese dato cargado.", "resolved": True}}
 
         pending_narr = self._get_pending_narrative(chat_session_id)
         if pending_narr:
@@ -613,7 +613,7 @@ class RAGPipeline:
             self._clear_pending_narrative(chat_session_id)
             if text:
                 return {"route": "NARRATIVE_SQL", "data": {"snies": snies, "source": "title_select", "field": pending_narr, "text": text, "resolved": True}}
-            return {"route": "NARRATIVE_NOT_FOUND", "data": {"snies": snies, "source": "title_select", "field": pending_narr, "message": "No tengo ese campo narrativo cargado.", "resolved": False}}
+            return {"route": "NARRATIVE_NOT_FOUND", "data": {"snies": snies, "source": "title_select", "field": pending_narr, "message": "No tengo ese campo narrativo cargado.", "resolved": True}}
 
         if self._get_pending_overview(chat_session_id):
             self._clear_pending_overview(chat_session_id)
@@ -819,7 +819,7 @@ class RAGPipeline:
                         return self._return_no_llm(chat_session_id, question,
                                                    {"route": "PROGRAM_FIELD", "data": {"snies": snies_num, "source": "explicit", "field": pending_field, "text": ans, "resolved": True}})
                     return self._return_no_llm(chat_session_id, question,
-                                               {"route": "NOT_FOUND", "data": {"message": "Identifiqué el programa, pero no tengo ese dato cargado.", "resolved": False}})
+                                               {"route": "NOT_FOUND", "data": {"message": "Identifiqué el programa, pero no tengo ese dato cargado.", "resolved": True}})
 
                 pending_narr = self._get_pending_narrative(chat_session_id)
                 if pending_narr:
@@ -830,7 +830,7 @@ class RAGPipeline:
                         return self._return_no_llm(chat_session_id, question,
                                                    {"route": "NARRATIVE_SQL", "data": {"snies": snies_num, "source": "explicit", "field": pending_narr, "text": text, "resolved": True}})
                     return self._return_no_llm(chat_session_id, question,
-                                               {"route": "NARRATIVE_NOT_FOUND", "data": {"snies": snies_num, "source": "explicit", "field": pending_narr, "message": "No tengo ese campo narrativo cargado.", "resolved": False}})
+                                               {"route": "NARRATIVE_NOT_FOUND", "data": {"snies": snies_num, "source": "explicit", "field": pending_narr, "message": "No tengo ese campo narrativo cargado.", "resolved": True}})
 
                 pending_tab = self._get_pending_tabular(chat_session_id)
                 if pending_tab:
@@ -874,7 +874,7 @@ class RAGPipeline:
                     {"route": "OUT_OF_DOMAIN", "data": {
                         "answer": _OUT_OF_DOMAIN_MSG,
                         "reason": "classifier",
-                        "resolved": False,
+                        "resolved": True,
                     }},
                 )
 
@@ -889,10 +889,10 @@ class RAGPipeline:
             snies = self._get_active_snies(chat_session_id)
             source = "memory"
             if not snies:
-                if not analysis.has_program_reference and not analysis.can_use_memory_for_program_resolution:
+                if not self._get_active_snies(chat_session_id) and not analysis.has_program_reference and not analysis.can_use_memory_for_program_resolution:
                     self._set_pending_narrative(chat_session_id, narr_field)
                     return self._return_no_llm(chat_session_id, question,
-                                               {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": False}})
+                                               {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": True}})
                 snies, source = self._ensure_program(
                     question, chat_session_id,
                     allow_embedding=analysis.has_program_reference,
@@ -902,12 +902,12 @@ class RAGPipeline:
             if not snies:
                 self._set_pending_narrative(chat_session_id, narr_field)
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": False}})
+                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": True}})
             self._set_active_snies(chat_session_id, snies)
             text = self.sql.get_program_narrative_field(snies, narr_field)
             if not text:
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "NARRATIVE_NOT_FOUND", "data": {"snies": snies, "source": source, "field": narr_field, "message": "No tengo ese campo narrativo cargado para este programa.", "resolved": False}})
+                                           {"route": "NARRATIVE_NOT_FOUND", "data": {"snies": snies, "source": source, "field": narr_field, "message": "No tengo ese campo narrativo cargado para este programa.", "resolved": True}})
             self._clear_pending_narrative(chat_session_id)
             return self._return_no_llm(chat_session_id, question,
                                        {"route": "NARRATIVE_SQL", "data": {"snies": snies, "source": source, "field": narr_field, "text": text, "resolved": True}})
@@ -922,7 +922,7 @@ class RAGPipeline:
             if not snies:
                 self._set_pending_overview(chat_session_id)
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": False}})
+                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": True}})
             self._set_active_snies(chat_session_id, snies)
 
             ctx = self.sql.get_program_brief_context(snies)
@@ -931,7 +931,7 @@ class RAGPipeline:
 
             if not ctx:
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "PROGRAM_OVERVIEW_NOT_FOUND", "data": {"snies": snies, "source": source, "message": "No tengo información narrativa cargada para ese programa.", "resolved": False}})
+                                           {"route": "PROGRAM_OVERVIEW_NOT_FOUND", "data": {"snies": snies, "source": source, "message": "No tengo información narrativa cargada para ese programa.", "resolved": True}})
             try:
                 answer = self.llm.generate_general_controlled(
                     context=ctx, question=question, chat_session_id=chat_session_id,
@@ -980,7 +980,7 @@ class RAGPipeline:
                     self._set_pending_tabular(
                         chat_session_id, "degree_options")
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": False}})
+                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": True}})
             self._set_active_snies(chat_session_id, snies)
             if asks_curriculum and semester is not None:
                 text = self.sql.get_curriculum_semester(snies, semester)
@@ -1037,7 +1037,7 @@ class RAGPipeline:
                 return self._return_no_llm(chat_session_id, question,
                                            {"route": "PROGRAM_MINMAX", "data": {**info, "resolved": True}})
             return self._return_no_llm(chat_session_id, question,
-                                       {"route": "NOT_FOUND", "data": {"message": "No tengo datos suficientes para comparar los programas en ese campo.", "resolved": False}})
+                                       {"route": "NOT_FOUND", "data": {"message": "No tengo datos suficientes para comparar los programas en ese campo.", "resolved": True}})
 
         if analysis.is_listing and not analysis.is_false_listing and analysis.field is None:
             topic = analysis.topic_for_listing
@@ -1068,7 +1068,7 @@ class RAGPipeline:
             if not self._get_active_snies(chat_session_id) and not analysis.has_program_reference and not analysis.can_use_memory_for_program_resolution:
                 self._set_pending_field(chat_session_id, field)
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": False}})
+                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": True}})
             snies, source = self._ensure_program(
                 question, chat_session_id,
                 allow_embedding=analysis.has_program_reference,
@@ -1078,7 +1078,7 @@ class RAGPipeline:
             if not snies:
                 self._set_pending_field(chat_session_id, field)
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": False}})
+                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": True}})
             self._set_active_snies(chat_session_id, snies)
             ans = self.sql.get_program_field(snies, field)
             if ans:
@@ -1086,7 +1086,7 @@ class RAGPipeline:
                 return self._return_no_llm(chat_session_id, question,
                                            {"route": "PROGRAM_FIELD", "data": {"snies": snies, "source": source, "field": field, "text": ans, "resolved": True}})
             return self._return_no_llm(chat_session_id, question,
-                                       {"route": "NOT_FOUND", "data": {"message": "No encontré ese dato específico en mis documentos.", "resolved": False}})
+                                       {"route": "NOT_FOUND", "data": {"message": "No encontré ese dato específico en mis documentos.", "resolved": True}})
 
         pending_field = self._get_pending_field(chat_session_id)
         pending_narr = self._get_pending_narrative(chat_session_id)
@@ -1099,7 +1099,7 @@ class RAGPipeline:
             )
             if not snies:
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "NEED_PROGRAM", "data": {"message": "No pude identificar el programa. Escríbeme el nombre completo o el SNIES.", "resolved": False}})
+                                           {"route": "NEED_PROGRAM", "data": {"message": "No pude identificar el programa. Escríbeme el nombre completo o el SNIES.", "resolved": True}})
             self._set_active_snies(chat_session_id, snies)
             if pending_field:
                 ans = self.sql.get_program_field(snies, pending_field)
@@ -1108,7 +1108,7 @@ class RAGPipeline:
                     return self._return_no_llm(chat_session_id, question,
                                                {"route": "PROGRAM_FIELD", "data": {"snies": snies, "source": source, "field": pending_field, "text": ans, "resolved": True}})
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "NOT_FOUND", "data": {"message": "Identifiqué el programa, pero no tengo ese dato cargado.", "resolved": False}})
+                                           {"route": "NOT_FOUND", "data": {"message": "Identifiqué el programa, pero no tengo ese dato cargado.", "resolved": True}})
             if pending_narr:
                 text = self.sql.get_program_narrative_field(
                     snies, pending_narr)
@@ -1117,7 +1117,7 @@ class RAGPipeline:
                     return self._return_no_llm(chat_session_id, question,
                                                {"route": "NARRATIVE_SQL", "data": {"snies": snies, "source": source, "field": pending_narr, "text": text, "resolved": True}})
                 return self._return_no_llm(chat_session_id, question,
-                                           {"route": "NARRATIVE_NOT_FOUND", "data": {"snies": snies, "source": source, "field": pending_narr, "message": "No tengo ese campo narrativo cargado.", "resolved": False}})
+                                           {"route": "NARRATIVE_NOT_FOUND", "data": {"snies": snies, "source": source, "field": pending_narr, "message": "No tengo ese campo narrativo cargado.", "resolved": True}})
 
         if analysis.is_general:
             active = self._get_active_snies(chat_session_id)
@@ -1200,7 +1200,7 @@ class RAGPipeline:
         if not vec_ctx:
             return self._return_no_llm(chat_session_id, question, {
                 "route": "NOT_FOUND",
-                "data": {"message": "No encontré información específica sobre eso en los documentos oficiales.", "resolved": False},
+                "data": {"message": "No encontré información específica sobre eso en los documentos oficiales.", "resolved": True},
             })
 
         best_sim = max((r.get("similarity") or 0) for r in vec_ctx)
@@ -1215,7 +1215,7 @@ class RAGPipeline:
                     ),
                     "catalogUrl": self.catalog_url,
                     "confidence": round(best_sim, 3),
-                    "resolved": False,
+                    "resolved": True,
                 },
             })
 
@@ -1229,7 +1229,7 @@ class RAGPipeline:
                     ),
                     "catalogUrl": self.catalog_url,
                     "confidence": round(best_sim, 3),
-                    "resolved": False,
+                    "resolved": True,
                 },
             })
 
