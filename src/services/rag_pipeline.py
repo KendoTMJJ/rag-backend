@@ -122,29 +122,6 @@ _OFFDOMAIN_NOUNS = frozenset({
     "hotel", "viaje", "vuelo", "pasaporte", "visa",
 })
 
-# Sustantivos claramente fuera del dominio académico.
-# Si aparecen en la pregunta, el clasificador SIEMPRE corre —
-# incluso con sesión activa — para evitar que la memoria del programa
-# responda preguntas como "y cuánto cuesta un pollo".
-_OFFDOMAIN_NOUNS = frozenset({
-    # Comida / animales
-    "pollo", "pizza", "hamburguesa", "empanada", "arepa", "perro", "gato",
-    "cerdo", "res", "vaca", "pez", "pescado", "arroz", "sopa", "carne",
-    "fruta", "verdura", "bebida", "cerveza", "vino", "cafe", "jugo",
-    # Personas / familia
-    "hijo", "hija", "bebe", "nino", "nina", "esposa", "esposo",
-    "mama", "papa", "abuelo", "abuela", "embarazo", "parto",
-    # Entretenimiento / tecnología cotidiana
-    "pelicula", "serie", "cancion", "album", "concierto", "videojuego",
-    "netflix", "spotify", "youtube", "instagram", "tiktok",
-    "celular", "telefono", "carro", "moto", "bicicleta", "bus",
-    # Finanzas personales no académicas
-    "bitcoin", "crypto", "dolar", "euro", "forex", "accion", "nft",
-    # Otros claramente OOD
-    "vacuna", "medicamento", "enfermedad", "receta", "restaurante",
-    "hotel", "viaje", "vuelo", "pasaporte", "visa",
-})
-
 V = TypeVar("V")
 
 

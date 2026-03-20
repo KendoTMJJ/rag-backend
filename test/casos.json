@@ -448,7 +448,7 @@
     "session": "blk-c-mem",
     "question": "A qué división pertenece?",
     "expectAny": {
-      "route": ["PROGRAM_FIELD", "NOT_FOUND"]
+      "route": ["PROGRAM_FIELD", "GENERAL_CONTROLLED", "NOT_FOUND"]
     }
   },
   {

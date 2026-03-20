@@ -1,6 +1,7 @@
 import os as _os
 import logging
 import re
+import threading
 import time
 from typing import List, Dict, Optional, Any
 
@@ -78,8 +79,10 @@ class _HistoryStore:
         self._maxsize = maxsize
         self._data: Dict[str, InMemoryChatMessageHistory] = {}
         self._ts: Dict[str, float] = {}
+        self._lock = threading.Lock()
 
     def _evict(self) -> None:
+        # Llamado solo desde get_or_create(), que ya sostiene el lock.
         now = time.monotonic()
         expired = [k for k, t in self._ts.items() if now - t > self._ttl]
         for k in expired:
@@ -92,29 +95,32 @@ class _HistoryStore:
                 self._ts.pop(k, None)
 
     def get_or_create(self, session_id: str) -> InMemoryChatMessageHistory:
-        now = time.monotonic()
-        ts = self._ts.get(session_id)
-        if ts is not None and (now - ts > self._ttl):
-            self._data.pop(session_id, None)
-            self._ts.pop(session_id, None)
-        if session_id not in self._data:
-            self._evict()
-            self._data[session_id] = InMemoryChatMessageHistory()
-        self._ts[session_id] = time.monotonic()
-        return self._data[session_id]
+        with self._lock:
+            now = time.monotonic()
+            ts = self._ts.get(session_id)
+            if ts is not None and (now - ts > self._ttl):
+                self._data.pop(session_id, None)
+                self._ts.pop(session_id, None)
+            if session_id not in self._data:
+                self._evict()
+                self._data[session_id] = InMemoryChatMessageHistory()
+            self._ts[session_id] = time.monotonic()
+            return self._data[session_id]
 
     def get(self, session_id: str) -> Optional[InMemoryChatMessageHistory]:
-        now = time.monotonic()
-        ts = self._ts.get(session_id)
-        if ts is None or (now - ts > self._ttl):
-            self._data.pop(session_id, None)
-            self._ts.pop(session_id, None)
-            return None
-        return self._data.get(session_id)
+        with self._lock:
+            now = time.monotonic()
+            ts = self._ts.get(session_id)
+            if ts is None or (now - ts > self._ttl):
+                self._data.pop(session_id, None)
+                self._ts.pop(session_id, None)
+                return None
+            return self._data.get(session_id)
 
     def pop(self, session_id: str) -> None:
-        self._data.pop(session_id, None)
-        self._ts.pop(session_id, None)
+        with self._lock:
+            self._data.pop(session_id, None)
+            self._ts.pop(session_id, None)
 
 
 # ──────────────────────────────────────────────────────────────

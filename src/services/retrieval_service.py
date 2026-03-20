@@ -5,6 +5,7 @@ from src.database.config import SessionLocal
 from src.models.embedding import ProgramEmbedding
 from src.models.program import Program
 from src.services.embedding_service import LocalEmbeddings
+from src.nlp.domain_guardrail import DOMAIN_CONFIDENCE_THRESHOLD
 
 
 LOOKUP_SECTIONS: Set[str] = {"program_name", "info_general", "division"}
@@ -182,7 +183,7 @@ class RetrievalService:
     def is_in_domain(
         self,
         query: str,
-        threshold: float = 0.45,
+        threshold: float = DOMAIN_CONFIDENCE_THRESHOLD,
     ) -> tuple[bool, float]:
         """
         Usa el índice de embeddings como juez de dominio.
@@ -197,9 +198,9 @@ class RetrievalService:
         Args:
             query:     Texto de la query del usuario.
             threshold: Similitud mínima para considerar in-domain.
-                       0.45 es deliberadamente bajo — solo rechaza queries
-                       que no tienen ninguna relación semántica con el índice.
-                       Súbelo a 0.50 si ves falsos positivos.
+                       Comparte valor con DOMAIN_CONFIDENCE_THRESHOLD de
+                       domain_guardrail.py (actualmente 0.25). Ajusta ese
+                       valor para cambiar el comportamiento en ambos módulos.
 
         Returns:
             (is_in_domain: bool, best_similarity: float)
