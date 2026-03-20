@@ -1,5 +1,6 @@
 # Claude Code instructions (puede contener info local)
 CLAUDE.md
+.claude/
 
 # Entorno virtual
 .venv/
