@@ -3,6 +3,9 @@
 venv/
 env/
 
+prueba.py
+
+
 # Variables de entorno (¡nunca subir!)
 .env
 .env.*
@@ -24,7 +27,6 @@ tmp/
 *.tmp
 
 # Modelos de ML descargados (pueden pesar GBs)
-models/
 *.bin
 *.safetensors
 *.onnx

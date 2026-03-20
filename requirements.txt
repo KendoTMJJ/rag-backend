@@ -9,6 +9,7 @@ pgvector
 
 # Embeddings
 langchain-community
+langchain_ollama
 sentence-transformers
 pandas
 openpyxl
@@ -17,3 +18,6 @@ openpyxl
 fastapi
 python-multipart
 uvicorn
+
+#Test
+pytest

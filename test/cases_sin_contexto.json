@@ -1,0 +1,159 @@
+[
+  {
+    "name": "Perfil de ingreso sin contexto -> NEED_PROGRAM",
+    "session": "new-narr-no-ctx-1",
+    "question": "¿Cuál es el perfil de ingreso?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Perfil ocupacional sin contexto -> NEED_PROGRAM",
+    "session": "new-narr-no-ctx-2",
+    "question": "¿Cuál es el perfil ocupacional?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Diferencial sin contexto -> NEED_PROGRAM",
+    "session": "new-narr-no-ctx-3",
+    "question": "¿Qué hace diferente a este programa?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Descripción sin contexto -> NEED_PROGRAM",
+    "session": "new-narr-no-ctx-4b",
+    "question": "¿De qué trata el programa?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Malla sin contexto -> NEED_PROGRAM",
+    "session": "new-tab-no-ctx-1",
+    "question": "¿Cuáles son las materias?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Semestre específico sin contexto -> NEED_PROGRAM",
+    "session": "new-tab-no-ctx-2",
+    "question": "¿Qué materias hay en el semestre 3?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Electivas sin contexto -> NEED_PROGRAM",
+    "session": "new-tab-no-ctx-3",
+    "question": "¿Tienen electivas?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Opciones de grado sin contexto -> NEED_PROGRAM",
+    "session": "new-tab-no-ctx-4",
+    "question": "¿Cómo me puedo graduar?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Costo sin contexto -> NEED_PROGRAM",
+    "session": "new-field-no-ctx-1",
+    "question": "¿Cuánto cuesta?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Duración sin contexto -> NEED_PROGRAM",
+    "session": "new-field-no-ctx-2",
+    "question": "¿Cuántos semestres dura?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Créditos sin contexto -> NEED_PROGRAM",
+    "session": "new-field-no-ctx-3",
+    "question": "¿Cuántos créditos son?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Título otorgado sin contexto -> NEED_PROGRAM o DEFAULT_RAG",
+    "session": "new-field-no-ctx-4",
+    "question": "¿Qué título me dan?",
+    "expectAny": { "route": ["NEED_PROGRAM", "DEFAULT_RAG", "NOT_FOUND"] }
+  },
+  {
+    "name": "Modalidad sin contexto -> NEED_PROGRAM",
+    "session": "new-field-no-ctx-5",
+    "question": "¿Es presencial o virtual?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Registro calificado sin contexto -> NEED_PROGRAM",
+    "session": "new-field-no-ctx-6",
+    "question": "¿Tiene registro calificado?",
+    "expectAny": { "route": ["NEED_PROGRAM", "DEFAULT_RAG", "NOT_FOUND"] }
+  },
+  {
+    "name": "Inscripción sin contexto -> INSCRIPTION_NEED_PROGRAM",
+    "session": "new-insc-no-ctx-fresh-001",
+    "question": "¿Cuáles son los requisitos para inscribirme?",
+    "expectAny": { "route": ["INSCRIPTION_NEED_PROGRAM", "INSCRIPTION_LINK"] },
+    "_note": "INSCRIPTION_LINK es válido si el embedding resuelve un programa por similitud. El comportamiento real es aceptable en ambos casos."
+  },
+  {
+    "name": "Fecha de inicio sin contexto -> NEED_PROGRAM o DEFAULT_RAG",
+    "session": "new-insc-no-ctx-2",
+    "question": "¿Cuándo empieza?",
+    "expectAny": { "route": ["NEED_PROGRAM", "DEFAULT_RAG", "NOT_FOUND"] }
+  },
+  {
+    "name": "Pregunta completamente fuera de dominio -> NOT_FOUND o DEFAULT_RAG",
+    "session": "new-ood-1",
+    "question": "¿Cuál es la capital de Francia?",
+    "expectAny": { "route": ["OUT_OF_DOMAIN", "DEFAULT_RAG", "LOW_CONFIDENCE"] }
+  },
+  {
+    "name": "Pregunta sobre la universidad sin programa -> DEFAULT_RAG o NOT_FOUND",
+    "session": "new-ood-2",
+    "question": "¿Cuántos años tiene la USTA?",
+    "expectAny": {
+      "route": [
+        "DEFAULT_RAG",
+        "NOT_FOUND",
+        "LOW_CONFIDENCE",
+        "GENERAL_CONTROLLED"
+      ]
+    }
+  },
+  {
+    "name": "Pregunta inventada sin ningún contexto -> NOT_FOUND o LOW_CONFIDENCE",
+    "session": "new-ood-3",
+    "question": "¿El programa tiene convenio con la NASA?",
+    "expectAny": {
+      "route": [
+        "NOT_FOUND",
+        "LOW_CONFIDENCE",
+        "DEFAULT_RAG",
+        "GENERAL_CONTROLLED",
+        "NEED_PROGRAM"
+      ]
+    }
+  },
+  {
+    "name": "Pregunta vaga que no identifica nada -> DEFAULT_RAG o NOT_FOUND",
+    "session": "new-ood-4",
+    "question": "¿Me puedes ayudar con información?",
+    "expectAny": { "route": ["DEFAULT_RAG", "NOT_FOUND", "GENERAL_CONTROLLED"] }
+  },
+  {
+    "name": "Comparación entre dos programas sin contexto -> DEFAULT_RAG o NOT_FOUND",
+    "session": "new-cmp-1",
+    "question": "¿Cuál es mejor, la maestría o la especialización?",
+    "expectAny": {
+      "route": ["DEFAULT_RAG", "NOT_FOUND", "LOW_CONFIDENCE", "LIST_PROGRAMS"]
+    }
+  },
+  {
+    "name": "Pregunta de razonamiento sin contexto -> LOW_CONFIDENCE o NOT_FOUND",
+    "session": "new-cmp-2",
+    "question": "¿Qué programa me conviene más si trabajo en salud pública?",
+    "expectAny": {
+      "route": [
+        "LOW_CONFIDENCE",
+        "NOT_FOUND",
+        "DEFAULT_RAG",
+        "LIST_PROGRAMS_FILTERED"
+      ]
+    }
+  }
+]
