@@ -777,7 +777,7 @@ class RAGPipeline:
                 {"route": route, "data": {
                     "answer": _OUT_OF_DOMAIN_MSG,
                     "reason": analysis.guard_reason,
-                    "resolved": False,
+                    "resolved": True,
                 }},
             )
 
@@ -786,7 +786,12 @@ class RAGPipeline:
         # por el bypass de sesión activa y lleguen a NOT_FOUND.
         if self._get_active_snies(chat_session_id):
             ds = score_domain(q_norm)
-            if ds.confidence < 0.10:
+            _skip_domain_check = (
+                analysis.field is not None
+                or analysis.has_structured_academic_intent
+                or len(q_norm.split()) <= 4
+            )
+            if ds.confidence < 0.10 and not _skip_domain_check:
                 logger.info(
                     "[DOMAIN_MIN_CHECK] Off-domain con sesión activa. session=%s q=%r confidence=%.3f",
                     chat_session_id, q_norm[:60], ds.confidence,
@@ -796,7 +801,7 @@ class RAGPipeline:
                     {"route": "OUT_OF_DOMAIN", "data": {
                         "answer": _OUT_OF_DOMAIN_MSG,
                         "reason": "off_domain_with_session",
-                        "resolved": False,
+                        "resolved": True,
                     }},
                 )
 
