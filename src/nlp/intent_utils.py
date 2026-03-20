@@ -315,6 +315,10 @@ def detect_field(q_norm: str) -> Optional[str]:
     ]):
         return None
 
+    # Exclusión: "¿qué hora es/son?" nunca es una consulta de horarios académicos
+    if re.search(r"\bque\s+hora\s+(es|son|era|eran|fue|fueron)\b", q):
+        return None
+
     # ── DURATION ─────────────────────────────────────────────────────────────
     if re.search(r"\bduracion\b", q):
         return "duration"

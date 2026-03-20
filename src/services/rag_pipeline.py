@@ -28,6 +28,7 @@ from src.nlp.intent_utils import (
 
 from src.nlp.input_sanitizer import sanitize
 from src.nlp.domain_guardrail import check_domain
+from src.nlp.domain_taxonomy import score_domain
 from src.quality.context_reranker import rerank_top
 from src.quality.output_validator import validate_output, CONFIDENCE_SHOW, CONFIDENCE_BLOCK
 from src.services.retrieval_service import PROGRAM_RESOLVE_MIN_SIM
@@ -89,6 +90,24 @@ _OUT_OF_DOMAIN_MSG = (
     "Solo puedo responder preguntas relacionadas con los programas de posgrado "
     "de la Universidad Santo Tomás Seccional Tunja. "
     "¿Hay algo sobre nuestros programas en lo que pueda ayudarte?"
+)
+
+_CAPABILITIES_TRIGGERS = frozenset({
+    "que puedo preguntar", "que puedes hacer", "que sabes",
+    "en que me ayudas", "como me puedes ayudar",
+    "para que sirves", "que eres", "como te uso", "como funciona",
+    "de que me puedes hablar", "que tipo de preguntas",
+})
+
+_CAPABILITIES_MSG = (
+    "Soy el Asistente Virtual de Posgrados USTA Tunja. Puedo responderte sobre:\n"
+    "• Programas disponibles: maestrías, especializaciones y doctorados\n"
+    "• Información de cada programa: duración, créditos, costo, modalidad, sede\n"
+    "• Malla curricular, asignaturas por semestre, electivas y opciones de grado\n"
+    "• Perfiles de ingreso, de egreso y ocupacional\n"
+    "• Proceso de inscripción y admisión\n\n"
+    "Puedes preguntarme por un programa específico (por nombre o SNIES) "
+    "o explorar la oferta general de posgrados."
 )
 
 # FIX D15/G3: keywords que bypasean el clasificador LLM porque son
@@ -737,6 +756,12 @@ class RAGPipeline:
             return self._return_no_llm(chat_session_id, question,
                                        {"route": "THANKS", "data": {"resolved": True}})
 
+        if any(t in q_norm for t in _CAPABILITIES_TRIGGERS):
+            return self._return_no_llm(chat_session_id, question,
+                                       {"route": "CAPABILITIES", "data": {
+                                           "answer": _CAPABILITIES_MSG,
+                                           "resolved": True}})
+
         analysis = self._analyze_request(question, q_norm, chat_session_id)
         semester = analysis.semester
 
@@ -755,6 +780,25 @@ class RAGPipeline:
                     "resolved": False,
                 }},
             )
+
+        # Verificación mínima de dominio incluso con sesión activa.
+        # Previene que frases OOD cortas (≤5 tokens) pasen el clasificador
+        # por el bypass de sesión activa y lleguen a NOT_FOUND.
+        if self._get_active_snies(chat_session_id):
+            ds = score_domain(q_norm)
+            if ds.confidence < 0.10:
+                logger.info(
+                    "[DOMAIN_MIN_CHECK] Off-domain con sesión activa. session=%s q=%r confidence=%.3f",
+                    chat_session_id, q_norm[:60], ds.confidence,
+                )
+                return self._return_no_llm(
+                    chat_session_id, question,
+                    {"route": "OUT_OF_DOMAIN", "data": {
+                        "answer": _OUT_OF_DOMAIN_MSG,
+                        "reason": "off_domain_with_session",
+                        "resolved": False,
+                    }},
+                )
 
         bare_snies = re.fullmatch(r"snies\s+(\d{5,10})", q_norm)
         if bare_snies:
@@ -840,6 +884,10 @@ class RAGPipeline:
             snies = self._get_active_snies(chat_session_id)
             source = "memory"
             if not snies:
+                if not analysis.has_program_reference and not analysis.can_use_memory_for_program_resolution:
+                    self._set_pending_narrative(chat_session_id, narr_field)
+                    return self._return_no_llm(chat_session_id, question,
+                                               {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": False}})
                 snies, source = self._ensure_program(
                     question, chat_session_id,
                     allow_embedding=analysis.has_program_reference,
@@ -1012,6 +1060,10 @@ class RAGPipeline:
 
         field = analysis.field
         if field is not None:
+            if not self._get_active_snies(chat_session_id) and not analysis.has_program_reference and not analysis.can_use_memory_for_program_resolution:
+                self._set_pending_field(chat_session_id, field)
+                return self._return_no_llm(chat_session_id, question,
+                                           {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": False}})
             snies, source = self._ensure_program(
                 question, chat_session_id,
                 allow_embedding=analysis.has_program_reference,
@@ -1205,13 +1257,6 @@ class RAGPipeline:
             logger.error(f"[DEFAULT_RAG] Error LLM: {e}", exc_info=True)
             return self._return_no_llm(chat_session_id, question,
                                        {"route": "LLM_ERROR", "data": {"message": "Tuve un problema procesando tu consulta. Intenta de nuevo.", "resolved": False}})
-
-        if not active_snies and vec_ctx:
-            top_pid = vec_ctx[0].get("program_id")
-            if top_pid:
-                snies_from_ctx = self.sql.get_snies_for_program(top_pid)
-                if snies_from_ctx:
-                    self._set_active_snies(chat_session_id, snies_from_ctx)
 
         _prog_source = "memory" if active_snies else "none"
         validation = validate_output(
