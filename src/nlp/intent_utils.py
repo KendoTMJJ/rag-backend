@@ -417,7 +417,7 @@ def detect_field(q_norm: str) -> Optional[str]:
 _RECOMMENDATION_RE = [
     re.compile(r"\b(que|qu[eé])\s+(puedo|podria|debo|deberia|me\s+conviene)\s+estudiar\b", re.IGNORECASE),
     re.compile(r"\b(que|qu[eé])\s+(programa|posgrado|maestr\w+|especializ\w+|doctorad\w+)\s+(me\s+)?(recomiendas?|sugieren?|aconsejan?|conviene|seria\s+(?:bueno|ideal|adecuado))\b", re.IGNORECASE),
-    re.compile(r"\b(que|qu[eé])\s+me\s+(recomiendas?|sugieren?|aconsejan?)\b", re.IGNORECASE),
+    re.compile(r"\b(que|qu[eé])\s+me\s+(recomiend(?:a|as|an)|sugieren?|aconsejan?)\b", re.IGNORECASE),
     re.compile(r"\bpara\s+alguien\s+(como\s+yo|que\s+(?:es|trabaja|se\s+dedica|tiene\s+perfil))\b", re.IGNORECASE),
     re.compile(r"\btengo\s+(?:perfil|experiencia|formacion)\s+(?:de|en)\b", re.IGNORECASE),
     re.compile(r"\bsoy\s+\w+(\s+\w+)?\s+y\s+(?:quiero|busco|deseo|me\s+gustar[ií]a)\s+(?:estudiar|especializarme|hacer\s+(?:un|una)\s+posgrado)\b", re.IGNORECASE),
@@ -487,7 +487,7 @@ def is_global_comparison(q_norm: str) -> bool:
         "mas ", "menos ", "mayor ", "menor ", "minimo", "maximo",
         "cual tiene", "cual dura", "cual cuesta",
         "cual es el mas", "cual es el menos",
-        "top ", "ranking", "compar", "mejor ", "peor ", "barato", "caro",
+        "top ", "ranking", "compar", "mejor ", "peor ", "barato", "mas caro",
     ]
     return any(t in q_norm for t in superlatives)
 
@@ -495,6 +495,6 @@ def is_global_comparison(q_norm: str) -> bool:
 def resolve_minmax_mode(q_norm: str) -> str:
     if any(w in q_norm for w in ["economico", "economica", "barato", "barata", "menos ", "menor ", "minimo"]):
         return "min"
-    if any(w in q_norm for w in ["mas ", "mayor ", "maximo", "caro", "cara"]):
+    if any(w in q_norm for w in ["mas ", "mayor ", "maximo", "mas caro", "mas cara"]):
         return "max"
     return "min"
