@@ -411,6 +411,74 @@ def detect_field(q_norm: str) -> Optional[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Recomendaciones / orientación vocacional
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RECOMMENDATION_RE = [
+    re.compile(r"\b(que|qu[eé])\s+(puedo|podria|debo|deberia|me\s+conviene)\s+estudiar\b", re.IGNORECASE),
+    re.compile(r"\b(que|qu[eé])\s+(programa|posgrado|maestr\w+|especializ\w+|doctorad\w+)\s+(me\s+)?(recomiendas?|sugieren?|aconsejan?|conviene|seria\s+(?:bueno|ideal|adecuado))\b", re.IGNORECASE),
+    re.compile(r"\b(que|qu[eé])\s+me\s+(recomiendas?|sugieren?|aconsejan?)\b", re.IGNORECASE),
+    re.compile(r"\bpara\s+alguien\s+(como\s+yo|que\s+(?:es|trabaja|se\s+dedica|tiene\s+perfil))\b", re.IGNORECASE),
+    re.compile(r"\btengo\s+(?:perfil|experiencia|formacion)\s+(?:de|en)\b", re.IGNORECASE),
+    re.compile(r"\bsoy\s+\w+(\s+\w+)?\s+y\s+(?:quiero|busco|deseo|me\s+gustar[ií]a)\s+(?:estudiar|especializarme|hacer\s+(?:un|una)\s+posgrado)\b", re.IGNORECASE),
+]
+
+_PROFILE_PATTERNS = [
+    r"\bsi\s+soy\s+(?:un[ao]?\s+)?(.+?)(?:[?,!]|$)",
+    r"\bsiendo\s+(?:un[ao]?\s+)?(.+?)(?:[?,!]|$)",
+    r"\bsi\s+me\s+gustan?\s+(.+?)(?:[?,!]|$)",
+    r"\bsi\s+me\s+interesa(?:n)?\s+(.+?)(?:[?,!]|$)",
+    r"\bme\s+gustan?\s+(.+?)\s+(?:que\s+puedo|que\s+debo|y\s+(?:quiero|busco|deseo))",
+    r"\bque\s+le\s+gustan?\s+(.+?)(?:[?,!]|$)",
+    r"\btengo\s+(?:perfil|experiencia|formacion)\s+(?:de|en)\s+(.+?)(?:[?,!]|$)",
+    r"\bsoy\s+(?:un[ao]?\s+)?(.+?)\s+(?:y\s+(?:quiero|busco|deseo|me\s+gustar[ií]a)|[,]\s*que|que\s+(?:me\s+)?(?:recomiendas?|sugieren?|aconsejan?))",
+    r"\bsoy\s+(?:un[ao]?\s+)?(.+?)(?:[?,!]|$)",
+    r"\bme\s+dedico\s+(?:a|al?)\s+(.+?)(?:[?,!]|$)",
+    r"\btrabajo\s+(?:en|como|de)\s+(.+?)(?:[?,!]|$)",
+]
+
+_PROFILE_LEADING_ARTICLES = re.compile(
+    r"^(?:el|la|los|las|un|una|unos|unas)\s+", re.IGNORECASE)
+
+
+def is_recommendation_query(q_norm: str) -> bool:
+    """Detecta si la pregunta es una solicitud de orientación o recomendación
+    de programas basada en el perfil o intereses del usuario."""
+    return any(p.search(q_norm or "") for p in _RECOMMENDATION_RE)
+
+
+def extract_profile_for_recommendation(question: str) -> Optional[str]:
+    """
+    Extrae el perfil o interés del usuario de una pregunta de recomendación.
+
+    Usa regex estructural para capturar lo que venga después de patrones
+    como "si soy", "siendo", "si me gusta", etc. sin listas quemadas.
+    Si ningún patrón específico captura el perfil, retorna la pregunta
+    normalizada completa para que el LLM decida.
+
+    Returns:
+        Texto del perfil/interés, o None si la pregunta no es de recomendación.
+    """
+    qn = normalize_and_fix(question)
+    if not qn or not is_recommendation_query(qn):
+        return None
+
+    for pattern in _PROFILE_PATTERNS:
+        m = re.search(pattern, qn, re.IGNORECASE)
+        if not m:
+            continue
+        profile = m.group(1).strip()
+        profile = re.sub(r"[?.!,;]+$", "", profile).strip()
+        profile = _PROFILE_LEADING_ARTICLES.sub("", profile).strip()
+        profile = re.sub(r"\s+", " ", profile)
+        words = profile.lower().split()
+        if words and not all(w in _TOPIC_STOPWORDS for w in words) and len(profile) >= 3:
+            return profile
+
+    return qn
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Comparaciones globales
 # ─────────────────────────────────────────────────────────────────────────────
 
