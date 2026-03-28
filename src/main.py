@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from src.api.routes.admin_knowledge import router as admin_knowledge_router
 from src.api.routes.chat import router as chat_router
+from src.api.routes.health import router as health_router
 from src.services.embedding_service import get_embedding_model
 
 
@@ -21,3 +22,4 @@ app = FastAPI(
 
 app.include_router(admin_knowledge_router)
 app.include_router(chat_router)
+app.include_router(health_router)
