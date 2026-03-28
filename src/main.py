@@ -1,6 +1,9 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 from src.api.routes.admin_knowledge import router as admin_knowledge_router
 from src.api.routes.chat import router as chat_router
