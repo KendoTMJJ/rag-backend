@@ -26,6 +26,7 @@ from src.nlp.intent_utils import (
     detect_field,
     is_recommendation_query,
     extract_profile_for_recommendation,
+    looks_like_escalation_candidate,
 )
 
 from src.nlp.input_sanitizer import sanitize
@@ -118,7 +119,7 @@ _CAPABILITIES_MSG = (
 _ACADEMIC_BYPASS_KEYWORDS = frozenset({
     "posgrado", "posgrados", "maestria", "maestrias", "especializacion",
     "especializaciones", "doctorado", "doctorados", "especializarme",
-    "postgrado", "postgrados",
+    "postgrado", "postgrados", "programa", "programas",
 })
 
 # Sustantivos claramente fuera del dominio académico.
@@ -871,6 +872,18 @@ class RAGPipeline:
                         "snies": snies_num,
                         "message": "Listo. ¿Qué información necesitas (duración, costo, créditos, malla, etc.)?",
                         "resolved": True}},
+                )
+
+        if looks_like_escalation_candidate(q_norm):
+            if self.llm.classify_escalation(question):
+                logger.info(
+                    "[ESCALATION] session=%s q=%r",
+                    chat_session_id, question[:60],
+                )
+                return self._return_no_llm(
+                    chat_session_id,
+                    question,
+                    {"route": "ESCALATION_INTENT", "data": {"resolved": True}},
                 )
 
         if analysis.should_run_classifier:

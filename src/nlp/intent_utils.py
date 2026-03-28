@@ -479,6 +479,30 @@ def extract_profile_for_recommendation(question: str) -> Optional[str]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Detección de escalación (contacto humano / canales de la institución)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ESCALATION_SIGNALS = frozenset({
+    "contacto", "contactarlos", "contactarme", "contactar",
+    "whatsapp", "wasap", "wsp",
+    "telefono", "celular", "llamar",
+    "correo", "email",
+    "hablar con",
+    "canales de contacto", "canales de comunicacion",
+    "comunicarme", "comunicarlos", "comunicarse",
+    "alguien de la", "una persona", "un asesor",
+    "numero de contacto",
+})
+
+
+def looks_like_escalation_candidate(q_norm: str) -> bool:
+    """Pre-filtro rápido: True si la pregunta contiene señales de escalación.
+    Solo sirve para decidir si vale la pena llamar al LLM clasificador."""
+    q = (q_norm or "").strip()
+    return any(s in q for s in _ESCALATION_SIGNALS)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Comparaciones globales
 # ─────────────────────────────────────────────────────────────────────────────
 

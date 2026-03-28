@@ -441,6 +441,95 @@ class LLMService:
             return True
 
     # ──────────────────────────────────────────────────────────────
+    # Clasificador de escalación (contacto humano)
+    # ──────────────────────────────────────────────────────────────
+
+    _ESCALATION_PROMPT = (
+        "Eres un clasificador para un chatbot universitario de posgrados.\n"
+        "Tu única tarea: decidir si el usuario quiere contactar a la universidad, "
+        "hablar con una persona, o pide información de contacto "
+        "(teléfono, WhatsApp, correo, sede, canales de contacto).\n\n"
+        "Responde SOLO con una de estas dos palabras, sin puntuación ni explicación:\n"
+        "ESCALATION\n"
+        "NOT_ESCALATION\n\n"
+        "Considera ESCALATION si la pregunta:\n"
+        "- Pide datos de contacto de la universidad (teléfono, WhatsApp, correo, dirección)\n"
+        "- Quiere hablar con una persona, asesor o agente\n"
+        "- Pregunta por canales de comunicación o cómo contactarse\n\n"
+        "Considera NOT_ESCALATION si la pregunta:\n"
+        "- Es sobre programas académicos, costos, duración, requisitos\n"
+        "- Pide recomendaciones de posgrado o qué programas hay\n"
+        "- Es un saludo, agradecimiento o pregunta general\n\n"
+        "PREGUNTA: {question}\n\n"
+        "Responde:"
+    )
+
+    def classify_escalation(self, question: str) -> bool:
+        """
+        Clasifica si la pregunta es un intento de contactar soporte humano.
+
+        Fallback (fail-closed): si el LLM falla o supera el timeout → False.
+        Es preferible no detectar escalación que bloquear preguntas legítimas.
+        """
+        question = (question or "").strip()
+        if not question:
+            return False
+
+        prompt_text = self._ESCALATION_PROMPT.format(question=question[:220])
+
+        llm_bound = self.llm.bind(
+            options={
+                "num_predict": 8,
+                "top_k": 1,
+                "top_p": 1.0,
+                "temperature": 0.0,
+            },
+            stop=["\n", "---", " "],
+        )
+
+        try:
+            result_holder: list = []
+            error_holder: list = []
+
+            def _call():
+                try:
+                    r = llm_bound.invoke(prompt_text)
+                    result_holder.append(
+                        getattr(r, "content", str(r)).strip().upper())
+                except Exception as exc:
+                    error_holder.append(exc)
+
+            t = threading.Thread(target=_call, daemon=True)
+            t.start()
+            t.join(timeout=self._CLASSIFIER_TIMEOUT_SECONDS)
+
+            if t.is_alive():
+                logger.warning(
+                    "[classify_escalation] LLM timeout (%.0fs). Fail-closed.",
+                    self._CLASSIFIER_TIMEOUT_SECONDS,
+                )
+                return False
+
+            if error_holder:
+                logger.warning(
+                    "[classify_escalation] LLM error: %s. Fail-closed.", error_holder[0])
+                return False
+
+            answer = result_holder[0] if result_holder else ""
+            is_escalation = answer.startswith("ESCALATION") and not answer.startswith("NOT_")
+
+            logger.debug(
+                "[classify_escalation] q=%r llm_answer=%r is_escalation=%s",
+                question[:60], answer, is_escalation,
+            )
+            return is_escalation
+
+        except Exception as e:
+            logger.warning(
+                "[classify_escalation] Unexpected error: %s. Fail-closed.", e)
+            return False
+
+    # ──────────────────────────────────────────────────────────────
     # Generate — RAG principal
     # ──────────────────────────────────────────────────────────────
 
