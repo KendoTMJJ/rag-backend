@@ -33,7 +33,7 @@ from src.models.embedding import ProgramEmbedding
 from src.models.elective import Elective
 from src.models.degree_option import DegreeOption
 from src.models.narrative import ProgramNarrative
-from src.services.embedding_service import LocalEmbeddings
+from src.services.embedding_service import LocalEmbeddings, get_embedding_model
 
 # NUEVO: chunking semántico e importación de contexto de secciones
 from src.nlp.text_normalizer import semantic_chunk
@@ -162,7 +162,7 @@ class ProgramExcelParser:
 
     def __init__(self, file_path: str, narrative_embedder: Optional[LocalEmbeddings] = None):
         self.file_path = file_path
-        self.embedder = LocalEmbeddings()
+        self.embedder = get_embedding_model()
         self.narrative_embedder = narrative_embedder or self.embedder
 
     def load_and_sync(self):

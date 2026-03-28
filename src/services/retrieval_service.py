@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Set, NamedTuple
 from src.database.config import SessionLocal
 from src.models.embedding import ProgramEmbedding
 from src.models.program import Program
-from src.services.embedding_service import LocalEmbeddings
+from src.services.embedding_service import LocalEmbeddings, get_embedding_model
 from src.nlp.domain_guardrail import DOMAIN_CONFIDENCE_THRESHOLD
 
 
@@ -75,7 +75,7 @@ def _distance_threshold(
 
 class RetrievalService:
     def __init__(self):
-        self.embedding_model = LocalEmbeddings()
+        self.embedding_model = get_embedding_model()
 
     def semantic_search(
         self,

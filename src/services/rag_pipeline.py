@@ -24,6 +24,8 @@ from src.nlp.intent_utils import (
     extract_program_candidate,
     extract_topic_for_listing,
     detect_field,
+    is_recommendation_query,
+    extract_profile_for_recommendation,
 )
 
 from src.nlp.input_sanitizer import sanitize
@@ -54,6 +56,7 @@ class RequestAnalysis:
     asks_degree_options: bool
     asks_inscription: bool
     topic_for_listing: Optional[str]
+    recommendation_profile: Optional[str]
 
     guard_allowed: bool
     guard_reason: str
@@ -660,6 +663,12 @@ class RAGPipeline:
         topic = extract_topic_for_listing(question) if (
             is_listing and field is None) else None
 
+        recommendation_profile = (
+            extract_profile_for_recommendation(question)
+            if not is_listing and not is_false_list and field is None
+            else None
+        )
+
         guard = check_domain(q_norm)
 
         has_structured_academic_intent = any([
@@ -672,6 +681,7 @@ class RAGPipeline:
             asks_inscription,
             is_listing,
             is_general,
+            recommendation_profile is not None,
         ])
 
         # FIX I1/I2/I4/I5/I6: pasar field a _should_run_classifier
@@ -712,6 +722,7 @@ class RAGPipeline:
             asks_degree_options=tabular["asks_degree_options"],
             asks_inscription=asks_inscription,
             topic_for_listing=topic,
+            recommendation_profile=recommendation_profile,
             guard_allowed=guard.allowed,
             guard_reason=guard.reason,
             guard_detail=guard.detail,
@@ -1039,16 +1050,37 @@ class RAGPipeline:
             return self._return_no_llm(chat_session_id, question,
                                        {"route": "NOT_FOUND", "data": {"message": "No tengo datos suficientes para comparar los programas en ese campo.", "resolved": True}})
 
+        if analysis.recommendation_profile and not analysis.is_listing:
+            profile = analysis.recommendation_profile
+            all_programs = self.sql.list_programs_filtered(limit=100)
+            programs = self.llm.filter_programs_by_topic(all_programs, profile)
+            if programs:
+                if len(programs) == 1:
+                    self._set_active_snies(chat_session_id, programs[0]["snies"])
+                return self._return_no_llm(chat_session_id, question, {
+                    "route": "LIST_PROGRAMS_FILTERED",
+                    "data": {"intent": "RECOMMENDATION", "filters": {"profile": profile}, "items": programs, "resolved": True},
+                })
+            return self._return_no_llm(chat_session_id, question, {
+                "route": "LIST_PROGRAMS_FILTERED_EMPTY",
+                "data": {
+                    "intent": "RECOMMENDATION", "filters": {"profile": profile},
+                    "message": f'No encontré programas que se ajusten a tu perfil de "{profile}". Revisa el catálogo oficial:',
+                    "catalogUrl": self.catalog_url,
+                    "resolved": False,
+                },
+            })
+
         if analysis.is_listing and not analysis.is_false_listing and analysis.field is None:
             topic = analysis.topic_for_listing
             if not topic:
                 return self._return_no_llm(chat_session_id, question,
                                            {"route": "LIST_PROGRAMS", "data": {"catalogUrl": self.catalog_url, "resolved": True}})
-            programs = self.sql.list_programs_filtered(
-                division_like=None, modality_like=None, location_like=None,
-                type_like=None, name_like=topic, limit=80,
-            )
+            all_programs = self.sql.list_programs_filtered(limit=100)
+            programs = self.llm.filter_programs_by_topic(all_programs, topic)
             if programs:
+                if len(programs) == 1:
+                    self._set_active_snies(chat_session_id, programs[0]["snies"])
                 return self._return_no_llm(chat_session_id, question, {
                     "route": "LIST_PROGRAMS_FILTERED",
                     "data": {"intent": "LIST_PROGRAMS", "filters": {"topic": topic}, "items": programs, "resolved": True},
@@ -1235,6 +1267,24 @@ class RAGPipeline:
 
         vec_ctx = rerank_top(
             vec_ctx, active_program_id=active_program_id, top_k=6)
+
+        # Si no hay programa activo en sesión, guardar el dominante de los resultados.
+        # Esto habilita follow-ups ("¿cuántos créditos tiene?", "¿cuál es su horario?")
+        # sin que el usuario tenga que repetir el nombre del programa.
+        # Condiciones: el usuario mencionó un programa explícito (has_program_reference)
+        # O el top result tiene alta similitud y al menos 2 chunks del mismo programa.
+        if not active_snies and vec_ctx:
+            _top = vec_ctx[0]
+            _top_snies = _top.get("snies")
+            if _top_snies:
+                _top_pid = _top.get("program_id")
+                _same_prog = sum(
+                    1 for r in vec_ctx if r.get("program_id") == _top_pid)
+                if analysis.has_program_reference or (
+                    _top.get("similarity", 0) >= 0.72 and _same_prog >= 2
+                ):
+                    self._set_active_snies(chat_session_id, _top_snies)
+                    active_snies = _top_snies
 
         ctx_lines = ["INFORMACION RECUPERADA:"]
         for item in vec_ctx:

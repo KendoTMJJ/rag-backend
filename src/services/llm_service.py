@@ -581,6 +581,116 @@ class LLMService:
             )
 
     # ──────────────────────────────────────────────────────────────
+    # Filtrador de programas por tema / perfil
+    # ──────────────────────────────────────────────────────────────
+
+    _FILTER_TIMEOUT_SECONDS = float(_os.getenv("FILTER_TIMEOUT", "30.0"))
+
+    _FILTER_PROMPT = (
+        "Eres un filtrador de programas académicos de posgrado.\n"
+        "Se te da una lista de programas universitarios y un tema o perfil de consulta.\n"
+        "Tu tarea: identificar SOLO los programas que tengan relación directa con ese tema o perfil.\n\n"
+        "Devuelve ÚNICAMENTE los SNIES de los programas relevantes separados por comas.\n"
+        "Si ningún programa es relevante, responde exactamente: NINGUNO\n"
+        "No expliques nada. No escribas nombres. Solo los números SNIES o la palabra NINGUNO.\n\n"
+        "PROGRAMAS DISPONIBLES:\n"
+        "{programs_list}\n\n"
+        "TEMA O PERFIL: {topic}\n\n"
+        "SNIES relevantes:"
+    )
+
+    def filter_programs_by_topic(
+        self,
+        programs: List[Dict],
+        topic: str,
+    ) -> List[Dict]:
+        """
+        Usa el LLM para filtrar los programas relevantes dado un tema o perfil.
+
+        El LLM recibe la lista de programas (SNIES + nombre) y el topic, y devuelve
+        solo los SNIES que considera relevantes. Los SNIES se validan contra la lista
+        original para evitar alucinaciones.
+
+        Fallback: si el LLM falla o supera el timeout, retorna lista vacía.
+        """
+        if not programs or not topic:
+            return []
+
+        programs_list = "\n".join(
+            f"SNIES {p['snies']}: {p['programName']}" for p in programs
+        )
+        prompt_text = self._FILTER_PROMPT.format(
+            programs_list=programs_list,
+            topic=topic.strip()[:300],
+        )
+
+        llm_bound = self.llm.bind(
+            options={
+                "num_predict": 80,
+                "top_k": 1,
+                "top_p": 1.0,
+                "temperature": 0.0,
+            },
+            stop=["\n", "---"],
+        )
+
+        try:
+            result_holder: list = []
+            error_holder: list = []
+
+            def _call():
+                try:
+                    r = llm_bound.invoke(prompt_text)
+                    result_holder.append(
+                        getattr(r, "content", str(r)).strip())
+                except Exception as exc:
+                    error_holder.append(exc)
+
+            t = threading.Thread(target=_call, daemon=True)
+            t.start()
+            t.join(timeout=self._FILTER_TIMEOUT_SECONDS)
+
+            if t.is_alive():
+                logger.warning(
+                    "[filter_programs_by_topic] Timeout (%.0fs). Retornando vacío.",
+                    self._FILTER_TIMEOUT_SECONDS,
+                )
+                return []
+
+            if error_holder:
+                logger.warning(
+                    "[filter_programs_by_topic] LLM error: %s. Retornando vacío.",
+                    error_holder[0],
+                )
+                return []
+
+            answer = result_holder[0] if result_holder else ""
+
+            if not answer or answer.upper().startswith("NING"):
+                return []
+
+            # Validar SNIES contra la lista original para evitar alucinaciones
+            valid_snies = {p["snies"] for p in programs}
+            returned_snies = {
+                s.strip() for s in re.split(r"[,\s]+", answer)
+                if s.strip().isdigit()
+            }
+            matched_snies = returned_snies & valid_snies
+
+            result = [p for p in programs if p["snies"] in matched_snies]
+
+            logger.debug(
+                "[filter_programs_by_topic] topic=%r llm_answer=%r matched=%d/%d",
+                topic[:60], answer[:80], len(result), len(programs),
+            )
+            return result
+
+        except Exception as e:
+            logger.error(
+                "[filter_programs_by_topic] Error inesperado: %s", e, exc_info=True)
+            return []
+
+    # ──────────────────────────────────────────────────────────────
     # Extractor de intención y filtros
     # ──────────────────────────────────────────────────────────────
 
