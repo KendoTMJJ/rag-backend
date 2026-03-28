@@ -1236,6 +1236,24 @@ class RAGPipeline:
         vec_ctx = rerank_top(
             vec_ctx, active_program_id=active_program_id, top_k=6)
 
+        # Si no hay programa activo en sesión, guardar el dominante de los resultados.
+        # Esto habilita follow-ups ("¿cuántos créditos tiene?", "¿cuál es su horario?")
+        # sin que el usuario tenga que repetir el nombre del programa.
+        # Condiciones: el usuario mencionó un programa explícito (has_program_reference)
+        # O el top result tiene alta similitud y al menos 2 chunks del mismo programa.
+        if not active_snies and vec_ctx:
+            _top = vec_ctx[0]
+            _top_snies = _top.get("snies")
+            if _top_snies:
+                _top_pid = _top.get("program_id")
+                _same_prog = sum(
+                    1 for r in vec_ctx if r.get("program_id") == _top_pid)
+                if analysis.has_program_reference or (
+                    _top.get("similarity", 0) >= 0.72 and _same_prog >= 2
+                ):
+                    self._set_active_snies(chat_session_id, _top_snies)
+                    active_snies = _top_snies
+
         ctx_lines = ["INFORMACION RECUPERADA:"]
         for item in vec_ctx:
             prog_label = (
