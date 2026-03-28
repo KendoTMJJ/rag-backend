@@ -253,6 +253,7 @@ def extract_topic_for_listing(question: str) -> Optional[str]:
         r"\bdel?\s+area\s+de\s+(.+)$",
         r"\ben\s+el\s+area\s+de\s+(.+)$",
         r"\bsobre\s+(.+)$",
+        r"\bpara\s+(.+)$",
         r"\bde\s+(?!(?:los?|las?|un[oa]?)\s+(?:programas?|posgrados?|maestrias?|especializ\w*|doctorad\w*))\s*(.+)$",
         r"\ben\s+(.+)$",
     ]
