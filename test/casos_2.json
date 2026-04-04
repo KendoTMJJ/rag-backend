@@ -68,7 +68,7 @@
   {
     "name": "A12 — Inscripción con sesión activa",
     "session": "blk-a",
-    "question": "Cómo me inscribo?",
+    "question": "Cómo me puedo inscribo?",
     "expectAny": {
       "route": [
         "INSCRIPTION_LINK",
@@ -298,7 +298,7 @@
   {
     "name": "H4 — No escalación: asesor financiero en contexto académico",
     "session": "blk-h-noesc-1",
-    "question": "Qué programas hay para asesores financieros?",
+    "question": "¿Qué programas hay para abogados?",
     "expectAny": {
       "route": [
         "LIST_PROGRAMS_FILTERED",

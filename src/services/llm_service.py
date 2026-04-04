@@ -11,7 +11,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.chat_history import InMemoryChatMessageHistory
 
 logger = logging.getLogger(__name__)
-Message = Dict[str, str]  # {"role": "user|assistant|system", "content": "..."}
+Message = Dict[str, str]
 
 
 # ──────────────────────────────────────────────────────────────
@@ -285,7 +285,7 @@ class LLMService:
 
     def _system_rules_general_controlled(self) -> str:
         return (
-            "Eres el Asistente Virtual Oficial de Posgrados USTA Tunja. "
+            "Eres el Asistente Virtual Oficial de Posgrados Santo Tomás Tunja. "
             "Respondes preguntas generales usando únicamente el CONTEXTO VERIFICADO provisto.\n\n"
 
             "REGLAS:\n"
@@ -398,7 +398,6 @@ class LLMService:
         )
 
         try:
-            import threading
             result_holder: list = []
             error_holder: list = []
 
@@ -516,7 +515,8 @@ class LLMService:
                 return False
 
             answer = result_holder[0] if result_holder else ""
-            is_escalation = answer.startswith("ESCALATION") and not answer.startswith("NOT_")
+            is_escalation = answer.startswith(
+                "ESCALATION") and not answer.startswith("NOT_")
 
             logger.debug(
                 "[classify_escalation] q=%r llm_answer=%r is_escalation=%s",
@@ -554,8 +554,6 @@ class LLMService:
         config = {"configurable": {"session_id": chat_session_id}}
 
         try:
-            import threading
-
             result_holder: list = []
             error_holder: list = []
 
@@ -618,8 +616,6 @@ class LLMService:
         config = {"configurable": {"session_id": chat_session_id}}
 
         try:
-            import threading
-
             result_holder: list = []
             error_holder: list = []
 

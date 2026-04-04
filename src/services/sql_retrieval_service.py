@@ -32,17 +32,6 @@ def _norm(s: Optional[str]) -> str:
     return (s or "").strip()
 
 
-def _strip_accents(text: str) -> str:
-    import unicodedata
-    return "".join(
-        c for c in unicodedata.normalize("NFD", text)
-        if unicodedata.category(c) != "Mn"
-    )
-
-
-# FIX: mapa de tópicos de usuario → fragmento de división en BD.
-# Permite que "programas de salud" encuentre "División de Ciencias de la Salud"
-# aunque el topic no coincida literalmente con el nombre del programa.
 _TOPIC_TO_DIVISION: Dict[str, str] = {
     "salud": "Ciencias de la Salud",
     "medicina": "Ciencias de la Salud",
@@ -69,15 +58,21 @@ _TOPIC_TO_DIVISION: Dict[str, str] = {
 
 
 def _resolve_division_hint(topic: str) -> Optional[str]:
-    """
-    Dado un topic (sin tildes, minúsculas), retorna el fragmento de división
-    para usar como filtro SQL, o None si no hay mapeo conocido.
-    """
     t = _strip_accents(topic).lower().strip()
     for key, division in _TOPIC_TO_DIVISION.items():
         if key in t:
             return division
     return None
+
+
+def _strip_accents(text: str) -> str:
+    import unicodedata
+    return "".join(
+        c for c in unicodedata.normalize("NFD", text)
+        if unicodedata.category(c) != "Mn"
+    )
+
+
 
 
 class SQLRetrievalService:
@@ -373,14 +368,6 @@ class SQLRetrievalService:
         finally:
             session.close()
 
-    @staticmethod
-    def _strip_accents(text: str) -> str:
-        import unicodedata
-        return "".join(
-            c for c in unicodedata.normalize("NFD", text)
-            if unicodedata.category(c) != "Mn"
-        )
-
     def resolve_program_by_name(self, program_text: str) -> Dict[str, Any]:
         q = (program_text or "").strip()
         if not q:
@@ -388,7 +375,7 @@ class SQLRetrievalService:
 
         q = re.sub(r'["""\'`]', "", q)
         q = re.sub(r"\s+", " ", q).strip()
-        q_plain = self._strip_accents(q)
+        q_plain = _strip_accents(q)
 
         session = SessionLocal()
         try:
@@ -415,6 +402,7 @@ class SQLRetrievalService:
             if not tokens:
                 return {}
 
+            # SQL token filter (works when DB names have no accents)
             qry = session.query(Program)
             for t in tokens[:6]:
                 qry = qry.filter(func.lower(Program.program_name).contains(t))
@@ -422,6 +410,21 @@ class SQLRetrievalService:
             p3 = qry.order_by(func.length(Program.program_name).asc()).first()
             if p3:
                 return {"snies": str(p3.snies).strip(), "programName": p3.program_name}
+
+            # Python-side fallback: strip accents from DB names and compare.
+            # Handles the case where the user types without accents (e.g. "administracion")
+            # but the DB stores accented names (e.g. "Administración").
+            # Use the first token's unaccented prefix to fetch a small candidate set.
+            prefix_token = tokens[0][:5]  # short prefix to match accented variant
+            candidates = (
+                session.query(Program)
+                .filter(Program.program_name.ilike(f"%{prefix_token}%"))
+                .all()
+            )
+            for pc in candidates:
+                name_plain = _strip_accents(pc.program_name or "").lower()
+                if all(t in name_plain for t in tokens[:6]):
+                    return {"snies": str(pc.snies).strip(), "programName": pc.program_name}
 
             return {}
         finally:
@@ -472,7 +475,7 @@ class SQLRetrievalService:
                 q = q.filter(Program.location.ilike(f"%{ll}%"))
 
             if nl:
-                # FIX: verificar primero si el topic mapea a una división conocida.
+                # Verificar primero si el topic mapea a una división conocida.
                 # "salud" → filtra por división "Ciencias de la Salud" en lugar de
                 # buscar "salud" en program_name (donde no aparece).
                 division_hint = _resolve_division_hint(nl)

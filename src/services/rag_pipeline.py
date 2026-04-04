@@ -24,9 +24,9 @@ from src.nlp.intent_utils import (
     extract_program_candidate,
     extract_topic_for_listing,
     detect_field,
-    is_recommendation_query,
     extract_profile_for_recommendation,
     looks_like_escalation_candidate,
+    _BARE_PROGRAM_TYPES,
 )
 
 from src.nlp.input_sanitizer import sanitize
@@ -104,12 +104,12 @@ _CAPABILITIES_TRIGGERS = frozenset({
 })
 
 _CAPABILITIES_MSG = (
-    "Soy el Asistente Virtual de Posgrados USTA Tunja. Puedo responderte sobre:\n"
-    "• Programas disponibles: maestrías, especializaciones y doctorados\n"
-    "• Información de cada programa: duración, créditos, costo, modalidad, sede\n"
-    "• Malla curricular, asignaturas por semestre, electivas y opciones de grado\n"
-    "• Perfiles de ingreso, de egreso y ocupacional\n"
-    "• Proceso de inscripción y admisión\n\n"
+    "Soy el **Asistente de Posgrados Santo Tomás Tunja**. Puedo responderte sobre:\n\n"
+    "- 🎓 Programas disponibles: maestrías, especializaciones y doctorados\n"
+    "- 📋 Información de cada programa: duración, créditos, costo, modalidad, sede\n"
+    "- 📚 Malla curricular, asignaturas por semestre, electivas y opciones de grado\n"
+    "- 🎯 Perfiles de ingreso, de egreso y ocupacional\n"
+    "- 📝 Proceso de inscripción y admisión\n\n"
     "Puedes preguntarme por un programa específico (por nombre o SNIES) "
     "o explorar la oferta general de posgrados."
 )
@@ -125,7 +125,6 @@ _ACADEMIC_BYPASS_KEYWORDS = frozenset({
 # Sustantivos claramente fuera del dominio académico.
 # Si aparecen en la pregunta, el clasificador SIEMPRE corre —
 # incluso con sesión activa — para evitar que la memoria del programa
-# responda preguntas como "y cuánto cuesta un pollo".
 _OFFDOMAIN_NOUNS = frozenset({
     # Comida / animales
     "pollo", "pizza", "hamburguesa", "empanada", "arepa", "perro", "gato",
@@ -194,11 +193,7 @@ class RAGPipeline:
         self.vector = RetrievalService()
         self.sql = SQLRetrievalService()
 
-        self._snies_store: TTLStore[str] = TTLStore()
-        self._pending_field_store: TTLStore[str] = TTLStore()
-        self._pending_narrative_store: TTLStore[str] = TTLStore()
-        self._pending_overview_store: TTLStore[bool] = TTLStore()
-        self._pending_tabular_store: TTLStore[str] = TTLStore()
+        self._session_store: TTLStore[Dict[str, Any]] = TTLStore()
 
         self.llm = LLMService(
             base_url=(os.getenv("OLLAMA_BASE_URL") or "").strip(),
@@ -209,6 +204,45 @@ class RAGPipeline:
             "CATALOG_POSGRADOS_URL",
             "https://santototunja.edu.co/programas-academicos/programas/posgrados-presenciales",
         )
+        self._program_vocab: frozenset = self._build_program_vocab()
+
+    # ─────────────────────────────────────────
+    # Vocabulario de programas reales
+    # ─────────────────────────────────────────
+
+    def _build_program_vocab(self) -> frozenset:
+        """Carga los tokens significativos de los nombres de programa reales.
+        Se usa para rechazar resoluciones por embedding cuando el candidato
+        no comparte ningún término con ningún programa real de la BD."""
+        try:
+            programs = self.sql.list_programs_filtered(limit=200)
+            vocab: set = set()
+            for p in programs:
+                name = normalize_and_fix(p.get("programName", ""))
+                if not name:
+                    continue
+                for token in name.split():
+                    if len(token) >= 4 and token not in self._NAME_STOPWORDS:
+                        vocab.add(token)
+            logger.debug("[PROGRAM_VOCAB] Loaded %d tokens", len(vocab))
+            return frozenset(vocab)
+        except Exception as exc:
+            logger.warning("[PROGRAM_VOCAB] Could not build vocab: %s", exc)
+            return frozenset()
+
+    def _candidate_in_program_vocab(self, candidate: str) -> bool:
+        """Verifica que al menos un token del candidato esté en el vocabulario
+        de nombres reales. Si el vocabulario no se pudo cargar, deja pasar."""
+        if not self._program_vocab:
+            return True
+        cand_norm = normalize_and_fix(candidate) or ""
+        cand_tokens = {
+            t for t in cand_norm.split()
+            if len(t) >= 4 and t not in self._NAME_STOPWORDS
+        }
+        if not cand_tokens:
+            return False
+        return bool(cand_tokens & self._program_vocab)
 
     # ─────────────────────────────────────────
     # Historial
@@ -240,60 +274,67 @@ class RAGPipeline:
         return payload
 
     # ─────────────────────────────────────────
-    # Memoria SNIES
+    # Estado de sesión unificado
     # ─────────────────────────────────────────
+
+    def _get_session(self, sid: str) -> Dict[str, Any]:
+        return dict(self._session_store.get(sid) or {})
+
+    def _update_session(self, sid: str, **kwargs: Any) -> None:
+        state = self._get_session(sid)
+        state.update(kwargs)
+        self._session_store.set(sid, state)
 
     def _get_active_snies(self, sid: str) -> Optional[str]:
-        return self._snies_store.get(sid)
+        return self._get_session(sid).get("snies")
 
     def _set_active_snies(self, sid: str, snies: str) -> None:
-        self._snies_store.set(sid, str(snies).strip())
-
-    # ─────────────────────────────────────────
-    # Pendientes
-    # ─────────────────────────────────────────
+        self._update_session(sid, snies=str(snies).strip())
 
     def _set_pending_field(self, sid: str, v: str) -> None:
-        self._pending_field_store.set(sid, v)
+        self._update_session(sid, pending_field=v)
 
     def _get_pending_field(self, sid: str) -> Optional[str]:
-        return self._pending_field_store.get(sid)
+        return self._get_session(sid).get("pending_field")
 
     def _clear_pending_field(self, sid: str) -> None:
-        self._pending_field_store.pop(sid)
+        self._update_session(sid, pending_field=None)
 
     def _set_pending_narrative(self, sid: str, v: str) -> None:
-        self._pending_narrative_store.set(sid, v)
+        self._update_session(sid, pending_narrative=v)
 
     def _get_pending_narrative(self, sid: str) -> Optional[str]:
-        return self._pending_narrative_store.get(sid)
+        return self._get_session(sid).get("pending_narrative")
 
     def _clear_pending_narrative(self, sid: str) -> None:
-        self._pending_narrative_store.pop(sid)
+        self._update_session(sid, pending_narrative=None)
 
     def _set_pending_overview(self, sid: str) -> None:
-        self._pending_overview_store.set(sid, True)
+        self._update_session(sid, pending_overview=True)
 
     def _get_pending_overview(self, sid: str) -> bool:
-        return bool(self._pending_overview_store.get(sid, False))
+        return bool(self._get_session(sid).get("pending_overview", False))
 
     def _clear_pending_overview(self, sid: str) -> None:
-        self._pending_overview_store.pop(sid)
+        self._update_session(sid, pending_overview=False)
 
     def _set_pending_tabular(self, sid: str, v: str) -> None:
-        self._pending_tabular_store.set(sid, v)
+        self._update_session(sid, pending_tabular=v)
 
     def _get_pending_tabular(self, sid: str) -> Optional[str]:
-        return self._pending_tabular_store.get(sid)
+        return self._get_session(sid).get("pending_tabular")
 
     def _clear_pending_tabular(self, sid: str) -> None:
-        self._pending_tabular_store.pop(sid)
+        self._update_session(sid, pending_tabular=None)
 
     def _clear_all_pending(self, sid: str) -> None:
-        self._clear_pending_field(sid)
-        self._clear_pending_narrative(sid)
-        self._clear_pending_overview(sid)
-        self._clear_pending_tabular(sid)
+        self._update_session(
+            sid,
+            pending_field=None,
+            pending_narrative=None,
+            pending_overview=False,
+            pending_tabular=None,
+        )
 
     # ─────────────────────────────────────────
     # Detectores auxiliares
@@ -372,6 +413,48 @@ class RAGPipeline:
             return True
         return False
 
+    # ─────────────────────────────────────────
+    # Validación post-embedding
+    # ─────────────────────────────────────────
+
+    _NAME_STOPWORDS = frozenset({
+        "maestria", "especializacion", "doctorado", "programa", "posgrado",
+        "para", "sobre", "como", "cual", "este", "esta", "ese", "esa",
+        "cuanto", "cuesta", "dura", "tiene", "vale", "pago",
+        "los", "las", "del", "que", "una", "uno",
+    })
+
+    def _candidate_matches_resolved_name(
+        self, candidate: str, resolved_name: str
+    ) -> bool:
+        """
+        Comprueba que al menos un token significativo del candidato extraído
+        aparece en el nombre del programa resuelto por embedding.
+        Evita falsos positivos donde el embedding empareja programas con áreas
+        completamente distintas.
+        """
+        if not candidate or not resolved_name:
+            return True  # Sin datos para validar, dejar pasar
+        cand_norm = normalize_and_fix(candidate) or ""
+        name_norm = normalize_and_fix(resolved_name) or ""
+        cand_tokens = {
+            t for t in cand_norm.split()
+            if len(t) >= 4 and t not in self._NAME_STOPWORDS
+        }
+        if not cand_tokens:
+            return False  # Solo stopwords o siglas cortas — no se puede validar, rechazar
+        name_tokens = {
+            t for t in name_norm.split()
+            if len(t) >= 4 and t not in self._NAME_STOPWORDS
+        }
+        if not (cand_tokens & name_tokens):
+            return False  # Sin ningún token compartido
+        # Rechazar si el candidato tiene tokens significativos que no existen
+        # en el nombre resuelto — indica que el usuario inventó un calificador
+        # (ej. "administración de baños públicos" → "banos", "publicos" extra)
+        extra = cand_tokens - name_tokens
+        return len(extra) == 0
+
     def _looks_like_program_title(self, q_norm: str) -> bool:
         if not q_norm:
             return False
@@ -446,6 +529,16 @@ class RAGPipeline:
         has_structured_academic_intent: bool,
         field: Optional[str],
     ) -> bool:
+        # Si hay un estado pendiente (NEED_PROGRAM fue enviado), la respuesta
+        # del usuario es un nombre de programa — nunca clasificar como OOD.
+        if (
+            self._get_pending_tabular(chat_session_id) is not None
+            or self._get_pending_field(chat_session_id) is not None
+            or self._get_pending_narrative(chat_session_id) is not None
+            or self._get_pending_overview(chat_session_id)
+        ):
+            return False
+
         active_for_clf = self._get_active_snies(chat_session_id)
         q_tokens = q_norm.split()
 
@@ -474,6 +567,7 @@ class RAGPipeline:
             len(q_tokens) <= 1
             or (active_for_clf and len(q_tokens) <= 5)
             or has_academic_bypass
+            or field is not None   # campo detectado → pregunta académica, pedir programa en vez de OOD
             or (has_structured_academic_intent and not field_without_academic_context)
         )
         return not skip_clf
@@ -565,13 +659,32 @@ class RAGPipeline:
                 return str(sn).strip(), "sql_name"
 
         if allow_embedding:
-            for q in filter(None, [full_text, cand]):
-                resolved = self.vector.resolve_program(
-                    q, min_similarity=min_sim_embedding)
-                sn = resolved.snies if resolved else None
-                if sn:
-                    self._set_active_snies(chat_session_id, sn)
-                    return sn, "embedding"
+            check_cand = cand or full_text
+            if not self._candidate_in_program_vocab(check_cand):
+                logger.debug(
+                    "[EMBEDDING_RESOLVE] Skipped — candidate not in program vocab: %r",
+                    check_cand,
+                )
+            else:
+                for q in filter(None, [full_text, cand]):
+                    resolved = self.vector.resolve_program(
+                        q, min_similarity=min_sim_embedding)
+                    sn = resolved.snies if resolved else None
+                    if sn:
+                        # Validar que el nombre resuelto comparte términos con el
+                        # candidato. Evita falsos positivos donde un programa con
+                        # área completamente distinta supera el umbral de similitud.
+                        if not self._candidate_matches_resolved_name(
+                            check_cand, resolved.program_name
+                        ):
+                            logger.debug(
+                                "[EMBEDDING_RESOLVE] Rejected false positive: "
+                                "candidate=%r resolved=%r",
+                                check_cand, resolved.program_name,
+                            )
+                            continue
+                        self._set_active_snies(chat_session_id, sn)
+                        return sn, "embedding"
 
         if allow_memory_fallback:
             active = self._get_active_snies(chat_session_id)
@@ -591,12 +704,6 @@ class RAGPipeline:
             if cand:
                 found = self.sql.resolve_program_by_name(cand)
                 sn = found.get("snies") if found else None
-        if not sn:
-            resolved = self.vector.resolve_program(
-                question.strip(),
-                min_similarity=PROGRAM_RESOLVE_MIN_SIM["title_select"],
-            )
-            sn = resolved.snies if resolved else None
         if not sn:
             return None
 
@@ -793,6 +900,19 @@ class RAGPipeline:
                 }},
             )
 
+        # Escalación tiene prioridad sobre cualquier check de dominio
+        if looks_like_escalation_candidate(q_norm):
+            if self.llm.classify_escalation(question):
+                logger.info(
+                    "[ESCALATION] session=%s q=%r",
+                    chat_session_id, question[:60],
+                )
+                return self._return_no_llm(
+                    chat_session_id,
+                    question,
+                    {"route": "ESCALATION_INTENT", "data": {"resolved": True}},
+                )
+
         # Verificación mínima de dominio incluso con sesión activa.
         # Previene que frases OOD cortas (≤5 tokens) pasen el clasificador
         # por el bypass de sesión activa y lleguen a NOT_FOUND.
@@ -874,17 +994,21 @@ class RAGPipeline:
                         "resolved": True}},
                 )
 
-        if looks_like_escalation_candidate(q_norm):
-            if self.llm.classify_escalation(question):
-                logger.info(
-                    "[ESCALATION] session=%s q=%r",
-                    chat_session_id, question[:60],
-                )
-                return self._return_no_llm(
-                    chat_session_id,
-                    question,
-                    {"route": "ESCALATION_INTENT", "data": {"resolved": True}},
-                )
+        # Pending NEED_PROGRAM: si el usuario responde con un nombre de programa
+        # sin keywords de consulta estructurada (ej. "Auditoria en salud"),
+        # resolver antes de llegar al clasificador o al bloque de título formal.
+        if not analysis.has_structured_academic_intent:
+            _has_pending = (
+                self._get_pending_tabular(chat_session_id) is not None
+                or self._get_pending_field(chat_session_id) is not None
+                or self._get_pending_narrative(chat_session_id) is not None
+                or self._get_pending_overview(chat_session_id)
+            )
+            if _has_pending:
+                maybe = self._try_set_active_program_from_title(
+                    question, chat_session_id)
+                if maybe:
+                    return self._return_no_llm(chat_session_id, question, maybe)
 
         if analysis.should_run_classifier:
             if not self.llm.classify_domain(question):
@@ -907,6 +1031,19 @@ class RAGPipeline:
                 question, chat_session_id)
             if maybe:
                 return self._return_no_llm(chat_session_id, question, maybe)
+            # Título de programa detectado pero no existe en la base de conocimientos
+            return self._return_no_llm(chat_session_id, question, {
+                "route": "NOT_FOUND",
+                "data": {
+                    "message": (
+                        "No encontré ese programa en nuestra oferta de posgrados. "
+                        "Puedes preguntarme qué programas tenemos disponibles o "
+                        "revisar el catálogo oficial."
+                    ),
+                    "catalogUrl": self.catalog_url,
+                    "resolved": True,
+                },
+            })
 
         narr_field = analysis.narrative_field
         if narr_field:
@@ -924,6 +1061,13 @@ class RAGPipeline:
                     min_sim_embedding=PROGRAM_RESOLVE_MIN_SIM["narrative"],
                 )
             if not snies:
+                if analysis.has_program_reference:
+                    return self._return_no_llm(chat_session_id, question, {
+                        "route": "NOT_FOUND",
+                        "data": {"message": "No encontré ese programa en nuestra base de conocimientos. Puedes preguntarme qué programas tenemos disponibles.",
+                                 "catalogUrl": self.catalog_url,
+                                 "resolved": True, },
+                    })
                 self._set_pending_narrative(chat_session_id, narr_field)
                 return self._return_no_llm(chat_session_id, question,
                                            {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": True}})
@@ -944,6 +1088,12 @@ class RAGPipeline:
                 min_sim_embedding=PROGRAM_RESOLVE_MIN_SIM["default"],
             )
             if not snies:
+                if analysis.has_program_reference:
+                    return self._return_no_llm(chat_session_id, question, {
+                        "route": "NOT_FOUND",
+                        "data": {"message": "No encontré ese programa en nuestra base de conocimientos. Puedes preguntarme qué programas tenemos disponibles.",
+                                 "catalogUrl": self.catalog_url,
+                                 "resolved": True, }, })
                 self._set_pending_overview(chat_session_id)
                 return self._return_no_llm(chat_session_id, question,
                                            {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": True}})
@@ -989,13 +1139,22 @@ class RAGPipeline:
             snies = self._get_active_snies(chat_session_id)
             source = "memory"
             if not snies:
+                _tabular_cand = extract_program_candidate(question)
+                _allow_emb = analysis.has_program_reference or bool(
+                    _tabular_cand)
                 snies, source = self._ensure_program(
                     question, chat_session_id,
-                    allow_embedding=analysis.has_program_reference,
+                    allow_embedding=_allow_emb,
                     allow_memory_fallback=analysis.can_use_memory_for_program_resolution,
                     min_sim_embedding=PROGRAM_RESOLVE_MIN_SIM["tabular"],
                 )
             if not snies:
+                if analysis.has_program_reference:
+                    return self._return_no_llm(chat_session_id, question, {
+                        "route": "NOT_FOUND",
+                        "data": {"message": "No encontré ese programa en nuestra base de conocimientos. Puedes preguntarme qué programas tenemos disponibles.",
+                                 "catalogUrl": self.catalog_url,
+                                 "resolved": True, }, })
                 if asks_curriculum:
                     self._set_pending_tabular(chat_session_id, "curriculum")
                 elif asks_electives:
@@ -1041,7 +1200,7 @@ class RAGPipeline:
                     "data": {
                         "hint": "Para enviarte el enlace oficial necesito que me indiques el programa (o su SNIES).",
                         "example": "Ej: ¿Cómo me inscribo a la Maestría en Administración?",
-                        "resolved": False,
+                        "resolved": True,
                     },
                 })
             info = self.sql.get_inscription_info(snies)
@@ -1069,7 +1228,8 @@ class RAGPipeline:
             programs = self.llm.filter_programs_by_topic(all_programs, profile)
             if programs:
                 if len(programs) == 1:
-                    self._set_active_snies(chat_session_id, programs[0]["snies"])
+                    self._set_active_snies(
+                        chat_session_id, programs[0]["snies"])
                 return self._return_no_llm(chat_session_id, question, {
                     "route": "LIST_PROGRAMS_FILTERED",
                     "data": {"intent": "RECOMMENDATION", "filters": {"profile": profile}, "items": programs, "resolved": True},
@@ -1090,10 +1250,24 @@ class RAGPipeline:
                 return self._return_no_llm(chat_session_id, question,
                                            {"route": "LIST_PROGRAMS", "data": {"catalogUrl": self.catalog_url, "resolved": True}})
             all_programs = self.sql.list_programs_filtered(limit=100)
-            programs = self.llm.filter_programs_by_topic(all_programs, topic)
+            if topic in _BARE_PROGRAM_TYPES:
+                # Filtro exacto por tipo: no usar LLM, comparar nombre del programa
+                _singular = {
+                    "maestrias": "maestria",
+                    "doctorados": "doctorado",
+                    "especializaciones": "especializacion",
+                }.get(topic, topic)
+                programs = [
+                    p for p in all_programs
+                    if normalize_and_fix(p.get("programName", "")).startswith(_singular)
+                ]
+            else:
+                programs = self.llm.filter_programs_by_topic(
+                    all_programs, topic)
             if programs:
                 if len(programs) == 1:
-                    self._set_active_snies(chat_session_id, programs[0]["snies"])
+                    self._set_active_snies(
+                        chat_session_id, programs[0]["snies"])
                 return self._return_no_llm(chat_session_id, question, {
                     "route": "LIST_PROGRAMS_FILTERED",
                     "data": {"intent": "LIST_PROGRAMS", "filters": {"topic": topic}, "items": programs, "resolved": True},
@@ -1121,6 +1295,12 @@ class RAGPipeline:
                 min_sim_embedding=PROGRAM_RESOLVE_MIN_SIM["default"],
             )
             if not snies:
+                if analysis.has_program_reference:
+                    return self._return_no_llm(chat_session_id, question, {
+                        "route": "NOT_FOUND",
+                        "data": {"message": "No encontré ese programa en nuestra base de conocimientos. Puedes preguntarme qué programas tenemos disponibles.",
+                                 "catalogUrl": self.catalog_url,
+                                 "resolved": True, }, })
                 self._set_pending_field(chat_session_id, field)
                 return self._return_no_llm(chat_session_id, question,
                                            {"route": "NEED_PROGRAM", "data": {"message": "¿De qué programa necesitas esa información? Dime el nombre o el SNIES.", "resolved": True}})
@@ -1295,6 +1475,8 @@ class RAGPipeline:
                     1 for r in vec_ctx if r.get("program_id") == _top_pid)
                 if analysis.has_program_reference or (
                     _top.get("similarity", 0) >= 0.72 and _same_prog >= 2
+                ) or (
+                    _top.get("similarity", 0) >= 0.78 and _same_prog >= 1
                 ):
                     self._set_active_snies(chat_session_id, _top_snies)
                     active_snies = _top_snies

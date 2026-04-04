@@ -32,6 +32,10 @@ _LISTING_QUALIFIERS = [
     r"\bcuales?\s+posgrados\b",
     r"\bprogramas\s+(hay|son|existen|ofrece)\b",
     r"\bprogramas\s+(del?|de\s+la)\s+area\b",
+    # "¿cuáles son los programas disponibles?" — "son" entre cuáles y programas
+    r"\bcuales?\s+son\s+(los\s+|las\s+)?(programas?|posgrados?)\b",
+    # "programas disponibles", "programas que tienen"
+    r"\bprogramas?\s+disponibles?\b",
 ]
 
 _TABULAR_QUALIFIERS = [
@@ -78,7 +82,7 @@ _TOPIC_STOPWORDS = frozenset({
 def looks_like_program_word(q_norm: str) -> bool:
     if not q_norm:
         return False
-    if re.search(r"\b(program\w*|posgrad\w*|postgrad\w*|maestr\w*|doctorad\w*|especializ\w*)\b", q_norm):
+    if re.search(r"\b(program\w*|posgrad\w*|postgrad\w*|maestr\w*|doctorad\w*|especializ\w*|oferta\w*\s+academica\w*|oferta\w*\s+educativa\w*)\b", q_norm):
         return True
     if re.search(r"\b(pr\w*gram\w*|prog\w*ram\w*)\b", q_norm):
         return True
@@ -89,10 +93,21 @@ def looks_like_program_word(q_norm: str) -> bool:
 # Intención de listado
 # ─────────────────────────────────────────────────────────────────────────────
 
+_BARE_PROGRAM_TYPES = frozenset({
+    "maestria", "maestrias",
+    "doctorado", "doctorados",
+    "especializacion", "especializaciones",
+})
+
+
 def looks_like_programs_listing(q_norm: str) -> bool:
     q = (q_norm or "").strip()
     if not q:
         return False
+
+    # "Maestria" / "Doctorado" / "Especializacion" solos → listado por tipo
+    if q in _BARE_PROGRAM_TYPES:
+        return True
 
     if any(t in q for t in _OVERVIEW_TRIGGERS):
         if not any(re.search(lq, q) for lq in _LISTING_QUALIFIERS):
@@ -103,6 +118,10 @@ def looks_like_programs_listing(q_norm: str) -> bool:
 
     if is_false_listing(q):
         return False
+
+    # Cualquier qualifier de listado es suficiente por sí solo
+    if any(re.search(lq, q) for lq in _LISTING_QUALIFIERS):
+        return True
 
     if looks_like_program_word(q):
         if re.search(
@@ -209,10 +228,19 @@ def extract_semester(q_norm: str) -> Optional[int]:
     return None
 
 
+_TABULAR_PREFIX_RE = re.compile(
+    r"^\s*(?:plan\s+de\s+estudios|malla(?:\s+curricular)?|pensum|materias?|asignaturas?)\s+",
+    re.IGNORECASE,
+)
+
+
 def extract_program_candidate(text: str) -> Optional[str]:
     t = (text or "").strip()
     if not t:
         return None
+    # Strip leading tabular keywords so "plan de estudios de administracion"
+    # becomes "de administracion" and we extract "administracion", not "estudios de administracion".
+    t = _TABULAR_PREFIX_RE.sub("", t).strip()
     m = re.search(r"\b(?:de|del|en|para|sobre)\s+(.+)$", t, re.IGNORECASE)
     if not m:
         return None
@@ -240,6 +268,11 @@ def extract_topic_for_listing(question: str) -> Optional[str]:
     qn = normalize_and_fix(question)
     if not qn:
         return None
+
+    # "Maestria" / "Doctorado" / "Especializacion" solos → el tipo ES el topic
+    if qn in _BARE_PROGRAM_TYPES:
+        return qn
+
     if any(t in qn for t in _OVERVIEW_TRIGGERS):
         if not any(re.search(lq, qn) for lq in _LISTING_QUALIFIERS):
             return None
@@ -281,6 +314,17 @@ def extract_topic_for_listing(question: str) -> Optional[str]:
             continue
         if len(topic) >= 3:
             return topic
+
+    # "Qué maestrías hay?" / "Que doctorados tienen?" → sin topic adicional,
+    # pero el tipo de programa está en la query → usarlo como topic
+    _singular_map = {
+        "maestrias": "maestria",
+        "doctorados": "doctorado",
+        "especializaciones": "especializacion",
+    }
+    for bare in _BARE_PROGRAM_TYPES:
+        if re.search(rf"\b{bare}\b", qn, re.IGNORECASE):
+            return _singular_map.get(bare, bare)
 
     return None
 
@@ -416,12 +460,17 @@ def detect_field(q_norm: str) -> Optional[str]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 _RECOMMENDATION_RE = [
-    re.compile(r"\b(que|qu[eé])\s+(puedo|podria|debo|deberia|me\s+conviene)\s+estudiar\b", re.IGNORECASE),
+    re.compile(
+        r"\b(que|qu[eé])\s+(puedo|podria|debo|deberia|me\s+conviene)\s+estudiar\b", re.IGNORECASE),
     re.compile(r"\b(que|qu[eé])\s+(programa|posgrado|maestr\w+|especializ\w+|doctorad\w+)\s+(me\s+)?(recomiendas?|sugieren?|aconsejan?|conviene|seria\s+(?:bueno|ideal|adecuado))\b", re.IGNORECASE),
-    re.compile(r"\b(que|qu[eé])\s+me\s+(recomiend(?:a|as|an)|sugieren?|aconsejan?)\b", re.IGNORECASE),
-    re.compile(r"\bpara\s+alguien\s+(como\s+yo|que\s+(?:es|trabaja|se\s+dedica|tiene\s+perfil))\b", re.IGNORECASE),
-    re.compile(r"\btengo\s+(?:perfil|experiencia|formacion)\s+(?:de|en)\b", re.IGNORECASE),
-    re.compile(r"\bsoy\s+\w+(\s+\w+)?\s+y\s+(?:quiero|busco|deseo|me\s+gustar[ií]a)\s+(?:estudiar|especializarme|hacer\s+(?:un|una)\s+posgrado)\b", re.IGNORECASE),
+    re.compile(
+        r"\b(que|qu[eé])\s+me\s+(recomiend(?:a|as|an)|sugieren?|aconsejan?)\b", re.IGNORECASE),
+    re.compile(
+        r"\bpara\s+alguien\s+(como\s+yo|que\s+(?:es|trabaja|se\s+dedica|tiene\s+perfil))\b", re.IGNORECASE),
+    re.compile(
+        r"\btengo\s+(?:perfil|experiencia|formacion)\s+(?:de|en)\b", re.IGNORECASE),
+    re.compile(
+        r"\bsoy\s+\w+(\s+\w+)?\s+y\s+(?:quiero|busco|deseo|me\s+gustar[ií]a)\s+(?:estudiar|especializarme|hacer\s+(?:un|una)\s+posgrado)\b", re.IGNORECASE),
 ]
 
 _PROFILE_PATTERNS = [

@@ -108,10 +108,10 @@
     "question": "¿Cuántos años tiene la USTA?",
     "expectAny": {
       "route": [
+        "OUT_OF_DOMAIN",
         "DEFAULT_RAG",
-        "NOT_FOUND",
         "LOW_CONFIDENCE",
-        "GENERAL_CONTROLLED"
+        "OUT_OF_DOMAIN"
       ]
     }
   },

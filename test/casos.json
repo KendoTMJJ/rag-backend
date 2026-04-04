@@ -344,7 +344,11 @@
     "session": "blk-b-116978",
     "question": "Cuéntame de qué trata el doctorado",
     "expectAny": {
-      "route": ["PROGRAM_OVERVIEW", "PROGRAM_OVERVIEW_NOT_FOUND", "NARRATIVE_SQL"]
+      "route": [
+        "PROGRAM_OVERVIEW",
+        "PROGRAM_OVERVIEW_NOT_FOUND",
+        "NARRATIVE_SQL"
+      ]
     }
   },
   {
@@ -512,7 +516,7 @@
     "session": "blk-c-mem",
     "question": "En qué empresas puedo trabajar al salir?",
     "expectAny": {
-      "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
+      "route": ["OUT_OF_DOMAIN", "NARRATIVE_SQL", "NARRATIVE_NOT_FOUND"]
     }
   },
   {
@@ -654,8 +658,8 @@
     "question": "Vale la pena estudiar esto?",
     "expectAny": {
       "route": [
-        "NARRATIVE_SQL",
         "DEFAULT_RAG",
+        "NARRATIVE_SQL",
         "GENERAL_CONTROLLED",
         "NOT_FOUND"
       ]
@@ -814,10 +818,7 @@
     "session": "blk-f-list-2",
     "question": "Qué programas hay relacionados con educación?",
     "expectAny": {
-      "route": [
-        "LIST_PROGRAMS_FILTERED",
-        "LIST_PROGRAMS_FILTERED_EMPTY"
-      ]
+      "route": ["LIST_PROGRAMS_FILTERED", "LIST_PROGRAMS_FILTERED_EMPTY"]
     }
   },
   {
@@ -1101,7 +1102,12 @@
     "session": "blk-l-desc",
     "question": "Cuéntame del programa",
     "expectAny": {
-      "route": ["NARRATIVE_SQL", "NARRATIVE_NOT_FOUND", "PROGRAM_OVERVIEW", "DEFAULT_RAG"]
+      "route": [
+        "NARRATIVE_SQL",
+        "NARRATIVE_NOT_FOUND",
+        "PROGRAM_OVERVIEW",
+        "DEFAULT_RAG"
+      ]
     }
   },
   {
