@@ -10,7 +10,6 @@ class ProgramNarrative(Base):
     program_id: Mapped[int] = mapped_column(
         ForeignKey("programs.id"), unique=True, index=True)
 
-    # ✅ Excel nuevo (con significado correcto)
     admission_profile: Mapped[str] = mapped_column(
         Text, nullable=True)        # Perfil del Ingreso
     graduated_profile: Mapped[str] = mapped_column(
