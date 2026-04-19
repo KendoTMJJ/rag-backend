@@ -8,6 +8,16 @@ from src.nlp.text_normalizer import normalize_and_fix
 # Constantes compartidas
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Detecta preguntas sobre la institución en general (no sobre un programa específico)
+_INSTITUTIONAL_SIGNAL = re.compile(
+    r"\b(en\s+la\s+universidad|de\s+la\s+universidad|la\s+universidad|"
+    r"en\s+la\s+usta|de\s+la\s+usta)\b"
+)
+# Detecta contexto de programa específico que anula la señal institucional
+_HAS_PROGRAM_CONTEXT = re.compile(
+    r"\b(maestr|especializ|doctorad|posgrado|programa)\b"
+)
+
 _OVERVIEW_TRIGGERS = {
     "que me dices", "que me puede decir", "que me puedes decir",
     "puedes decirme", "puede decirme",
@@ -23,6 +33,13 @@ _OVERVIEW_TRIGGERS = {
     "cual es el enfoque", "enfoque del posgrado", "enfoque del programa",
     "que se aprende en", "que ensenan", "que se aprende",
     "cuentame del programa", "presentame el programa",
+    # solicitudes de información completa / más info
+    "dame toda la informacion", "toda la informacion",
+    "informacion completa", "informacion relevante",
+    "dame mas informacion", "mas informacion sobre",
+    "dime todo", "cuentame todo", "explicame todo",
+    "todo sobre", "todo lo que sabes", "todo lo relacionado",
+    "dame todo", "quiero saber todo", "informacion general",
 }
 
 _LISTING_QUALIFIERS = [
@@ -36,6 +53,9 @@ _LISTING_QUALIFIERS = [
     r"\bcuales?\s+son\s+(los\s+|las\s+)?(programas?|posgrados?)\b",
     # "programas disponibles", "programas que tienen"
     r"\bprogramas?\s+disponibles?\b",
+    # "¿qué modalidades/horarios/sedes hay en la universidad?" → listado institucional
+    r"\bque\s+(modalidades?|horarios?\s+de\s+clases?|sedes?|costos?|precios?)\s+(hay|existen|tienen|manejan|ofrecen)\b",
+    r"\bcuales?\s+(modalidades?|sedes?)\s+(hay|existen|tienen|son)\b",
 ]
 
 _TABULAR_QUALIFIERS = [
@@ -312,7 +332,7 @@ def extract_topic_for_listing(question: str) -> Optional[str]:
         words = topic.lower().split()
         if not words or all(w in _TOPIC_STOPWORDS for w in words):
             continue
-        if len(topic) >= 3:
+        if len(topic) >= 2:
             return topic
 
     # "Qué maestrías hay?" / "Que doctorados tienen?" → sin topic adicional,
@@ -364,6 +384,11 @@ def detect_field(q_norm: str) -> Optional[str]:
     if re.search(r"\bque\s+hora\s+(es|son|era|eran|fue|fueron)\b", q):
         return None
 
+    # Guard: pregunta sobre la institución en general, sin contexto de programa
+    # → no puede resolverse como campo de un programa específico
+    if _INSTITUTIONAL_SIGNAL.search(q) and not _HAS_PROGRAM_CONTEXT.search(q):
+        return None
+
     # ── DURATION ─────────────────────────────────────────────────────────────
     if re.search(r"\bduracion\b", q):
         return "duration"
@@ -403,7 +428,7 @@ def detect_field(q_norm: str) -> Optional[str]:
         return "cost"
 
     # ── MODALITY ─────────────────────────────────────────────────────────────
-    if re.search(r"\bmodalidad\b", q):
+    if re.search(r"\bmodalidades?\b", q):
         return "modality"
     if re.search(r"\b(presencial|virtual|semipresencial|a\s+distancia|hibrido|hibrida)\b", q):
         return "modality"
@@ -567,8 +592,8 @@ def is_global_comparison(q_norm: str) -> bool:
 
 
 def resolve_minmax_mode(q_norm: str) -> str:
-    if any(w in q_norm for w in ["economico", "economica", "barato", "barata", "menos ", "menor ", "minimo"]):
+    if any(w in q_norm for w in ["economico", "economica", "barato", "barata", "menos", "menor ", "minimo"]):
         return "min"
-    if any(w in q_norm for w in ["mas ", "mayor ", "maximo", "mas caro", "mas cara"]):
+    if any(w in q_norm for w in ["mayor ", "maximo", "mas caro", "mas cara"]):
         return "max"
     return "min"

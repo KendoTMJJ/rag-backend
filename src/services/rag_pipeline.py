@@ -2,7 +2,10 @@ import logging
 import os
 import re
 import time
-from typing import Optional, Dict, Any, Tuple, Generic, TypeVar
+import threading
+from typing import Optional, Dict, Any, Tuple, Generic, TypeVar, List
+
+import numpy as np
 from dataclasses import dataclass
 
 from src.quality.request_gate import validate_request_gate
@@ -64,7 +67,6 @@ class RequestAnalysis:
     guard_detail: str
 
     has_structured_academic_intent: bool
-    should_run_classifier: bool
 
     has_program_reference: bool
     can_use_memory_for_program_resolution: bool
@@ -91,10 +93,41 @@ _DEFAULT_RAG_SECTIONS = [
 ]
 
 _OUT_OF_DOMAIN_MSG = (
-    "Solo puedo responder preguntas relacionadas con los programas de posgrado "
-    "de la Universidad Santo Tomás Seccional Tunja. "
+    "Solo puedo ayudarte con preguntas sobre los programas de posgrado de la "
+    "Universidad Santo Tomás Seccional Tunja. Por ejemplo: ¿cuánto dura la "
+    "Maestría en Educación? ¿Cuáles son los requisitos de admisión? "
     "¿Hay algo sobre nuestros programas en lo que pueda ayudarte?"
 )
+
+_VOWELS_ES = frozenset("aeiouáéíóúü")
+
+
+def _is_noise_input(q_norm: str) -> bool:
+    """
+    Returns True if the normalized query looks like keyboard noise / gibberish
+    rather than a genuine question.
+
+    Catches  : "xxxxx", "000000", "qwerty", "zxcvbn" (vowel-free / all-same-char).
+    Passes   : short follow-ups, "snies", "malla", "111", valid SNIES numbers.
+    """
+    if not q_norm or len(q_norm) <= 2:
+        return False
+
+    tokens = [t for t in q_norm.split() if len(t) >= 3]
+    if not tokens:
+        return False  # Only very short tokens — let through
+
+    def _is_noise_token(tok: str) -> bool:
+        if any(c in _VOWELS_ES for c in tok):
+            return False  # Has a Spanish/English vowel → not noise
+        if tok.isdigit():
+            # Digits are noise if all-same char OR if > 10 digits (exceeds max SNIES length)
+            return len(set(tok)) == 1 or len(tok) > 10
+        return True  # No vowels, not digits → consonant-only garbage
+
+    noise_tokens = [t for t in tokens if _is_noise_token(t)]
+    return len(noise_tokens) == len(tokens)
+
 
 _CAPABILITIES_TRIGGERS = frozenset({
     "que puedo preguntar", "que puedes hacer", "que sabes",
@@ -114,36 +147,6 @@ _CAPABILITIES_MSG = (
     "o explorar la oferta general de posgrados."
 )
 
-# FIX D15/G3: keywords que bypasean el clasificador LLM porque son
-# claramente relacionadas con posgrados aunque la frase sea ambigua
-_ACADEMIC_BYPASS_KEYWORDS = frozenset({
-    "posgrado", "posgrados", "maestria", "maestrias", "especializacion",
-    "especializaciones", "doctorado", "doctorados", "especializarme",
-    "postgrado", "postgrados", "programa", "programas",
-})
-
-# Sustantivos claramente fuera del dominio académico.
-# Si aparecen en la pregunta, el clasificador SIEMPRE corre —
-# incluso con sesión activa — para evitar que la memoria del programa
-_OFFDOMAIN_NOUNS = frozenset({
-    # Comida / animales
-    "pollo", "pizza", "hamburguesa", "empanada", "arepa", "perro", "gato",
-    "cerdo", "res", "vaca", "pez", "pescado", "arroz", "sopa", "carne",
-    "fruta", "verdura", "bebida", "cerveza", "vino", "cafe", "jugo",
-    # Personas / familia
-    "hijo", "hija", "bebe", "nino", "nina", "esposa", "esposo",
-    "mama", "papa", "abuelo", "abuela", "embarazo", "parto",
-    # Entretenimiento / tecnología cotidiana
-    "pelicula", "serie", "cancion", "album", "concierto", "videojuego",
-    "netflix", "spotify", "youtube", "instagram", "tiktok",
-    "celular", "telefono", "carro", "moto", "bicicleta", "bus",
-    # Finanzas personales no académicas
-    "bitcoin", "crypto", "dolar", "euro", "forex", "accion", "nft",
-    # Otros claramente OOD
-    "vacuna", "medicamento", "enfermedad", "receta", "restaurante",
-    "hotel", "viaje", "vuelo", "pasaporte", "visa",
-})
-
 V = TypeVar("V")
 
 
@@ -153,8 +156,10 @@ class TTLStore(Generic[V]):
         self._maxsize = maxsize
         self._data: Dict[str, V] = {}
         self._ts: Dict[str, float] = {}
+        self._lock = threading.Lock()
 
     def _evict(self) -> None:
+        # Caller must hold self._lock
         now = time.monotonic()
         expired = [k for k, t in self._ts.items() if now - t > self._ttl]
         for k in expired:
@@ -167,22 +172,25 @@ class TTLStore(Generic[V]):
                 self._ts.pop(k, None)
 
     def get(self, key: str, default: Any = None) -> Any:
-        now = time.monotonic()
-        ts = self._ts.get(key)
-        if ts is None or (now - ts > self._ttl):
-            self._data.pop(key, None)
-            self._ts.pop(key, None)
-            return default
-        return self._data.get(key, default)
+        with self._lock:
+            now = time.monotonic()
+            ts = self._ts.get(key)
+            if ts is None or (now - ts > self._ttl):
+                self._data.pop(key, None)
+                self._ts.pop(key, None)
+                return default
+            return self._data.get(key, default)
 
     def set(self, key: str, value: V) -> None:
-        self._evict()
-        self._data[key] = value
-        self._ts[key] = time.monotonic()
+        with self._lock:
+            self._evict()
+            self._data[key] = value
+            self._ts[key] = time.monotonic()
 
     def pop(self, key: str, default: Any = None) -> Any:
-        self._ts.pop(key, None)
-        return self._data.pop(key, default)
+        with self._lock:
+            self._ts.pop(key, None)
+            return self._data.pop(key, default)
 
     def __contains__(self, key: str) -> bool:
         return self.get(key) is not None
@@ -455,6 +463,55 @@ class RAGPipeline:
         extra = cand_tokens - name_tokens
         return len(extra) == 0
 
+    # ─────────────────────────────────────────
+    # Filtrado por embedding (lab híbrido)
+    # ─────────────────────────────────────────
+
+    def _rank_programs_by_embedding(
+        self,
+        programs: List[Dict],
+        profile: str,
+        top_n: int = 10,
+    ) -> List[Dict]:
+        """
+        Rankea los programas por similitud de embedding con el perfil del usuario
+        y retorna los top_n más cercanos semánticamente.
+
+        Equivale a embedding_search_programs() del laboratorio híbrido:
+        reduce los candidatos de ~100 a top_n para que el LLM haga la
+        selección final sobre un conjunto manejable.
+
+        Los embeddings E5 están normalizados → dot product == cosine similarity.
+        """
+        if not programs or not profile:
+            return programs
+        try:
+            emb_model = self.vector.embedding_model
+            docs = [
+                f"{p['programName']} {p.get('division', '')}".strip()
+                for p in programs
+            ]
+            query_emb = np.array(emb_model.embed_query(profile))
+            doc_embs = np.array(emb_model.embed_documents(docs))
+            scores = doc_embs @ query_emb
+
+            ranked = sorted(
+                zip(programs, scores.tolist()),
+                key=lambda x: x[1],
+                reverse=True,
+            )
+
+            logger.debug(
+                "[embedding_rank] profile=%r top_n=%d top_score=%.4f bottom_score=%.4f",
+                profile[:60], top_n,
+                ranked[0][1] if ranked else 0.0,
+                ranked[min(top_n, len(ranked)) - 1][1] if ranked else 0.0,
+            )
+            return [p for p, _ in ranked[:top_n]]
+        except Exception as exc:
+            logger.warning("[embedding_rank] Error: %s. Usando lista completa.", exc)
+            return programs
+
     def _looks_like_program_title(self, q_norm: str) -> bool:
         if not q_norm:
             return False
@@ -521,56 +578,6 @@ class RAGPipeline:
                 and not any(w in q_norm for w in ["inscrip", "inscrib", "matricul", "pasos de inscripcion"])
             )
         )
-
-    def _should_run_classifier(
-        self,
-        q_norm: str,
-        chat_session_id: str,
-        has_structured_academic_intent: bool,
-        field: Optional[str],
-    ) -> bool:
-        # Si hay un estado pendiente (NEED_PROGRAM fue enviado), la respuesta
-        # del usuario es un nombre de programa — nunca clasificar como OOD.
-        if (
-            self._get_pending_tabular(chat_session_id) is not None
-            or self._get_pending_field(chat_session_id) is not None
-            or self._get_pending_narrative(chat_session_id) is not None
-            or self._get_pending_overview(chat_session_id)
-        ):
-            return False
-
-        active_for_clf = self._get_active_snies(chat_session_id)
-        q_tokens = q_norm.split()
-
-        # Si la pregunta contiene keywords académicos claros → nunca clasificar
-        has_academic_bypass = any(
-            w in q_norm for w in _ACADEMIC_BYPASS_KEYWORDS)
-
-        # FIX "y cuánto cuesta un pollo":
-        # Si la pregunta contiene un sustantivo claramente off-domain,
-        # SIEMPRE correr el clasificador — incluso con sesión activa.
-        # Evita que la memoria del programa responda preguntas trampa.
-        has_offdomain_noun = any(noun in q_norm for noun in _OFFDOMAIN_NOUNS)
-        if has_offdomain_noun and not has_academic_bypass:
-            return True  # forzar clasificador sin importar sesión
-
-        # Si hay campo detectado pero sin sesión activa y sin contexto académico,
-        # también correr clasificador (fix I1/I2/I6)
-        field_without_academic_context = (
-            field is not None
-            and not active_for_clf
-            and not has_academic_bypass
-            and not self.has_program_mention(q_norm)
-        )
-
-        skip_clf = (
-            len(q_tokens) <= 1
-            or (active_for_clf and len(q_tokens) <= 5)
-            or has_academic_bypass
-            or field is not None   # campo detectado → pregunta académica, pedir programa en vez de OOD
-            or (has_structured_academic_intent and not field_without_academic_context)
-        )
-        return not skip_clf
 
     def _can_use_memory_for_program_resolution(
         self,
@@ -768,6 +775,26 @@ class RAGPipeline:
         asks_inscription = self._detect_inscription_intent(
             q_norm, chat_session_id)
 
+        # ── Fallback LLM para overview ────────────────────────────────────────
+        # Si el fast-path no detectó overview, hay programa activo en sesión y
+        # ninguna otra intención específica fue identificada, usamos el LLM como
+        # árbitro. Evita depender de frases quemadas para peticiones ambiguas.
+        if (
+            not is_overview
+            and not field
+            and not narrative_field
+            and not is_listing
+            and not is_reasoning
+            and not tabular["asks_curriculum"]
+            and not tabular["asks_electives"]
+            and not tabular["asks_degree_options"]
+            and not asks_inscription
+            and self._get_active_snies(chat_session_id)
+        ):
+            is_overview = self.llm.classify_overview(question)
+            if is_overview:
+                logger.debug("[ANALYZE] classify_overview LLM → OVERVIEW for q=%r", q_norm[:60])
+
         topic = extract_topic_for_listing(question) if (
             is_listing and field is None) else None
 
@@ -775,6 +802,10 @@ class RAGPipeline:
             extract_profile_for_recommendation(question)
             if not is_listing and not is_false_list and field is None
             else None
+        )
+        logger.debug(
+            "[ANALYZE] q_norm=%r | is_listing=%s | is_false_list=%s | field=%s | is_overview=%s | recommendation_profile=%r",
+            q_norm[:80], is_listing, is_false_list, field, is_overview, recommendation_profile,
         )
 
         guard = check_domain(q_norm)
@@ -791,14 +822,6 @@ class RAGPipeline:
             is_general,
             recommendation_profile is not None,
         ])
-
-        # FIX I1/I2/I4/I5/I6: pasar field a _should_run_classifier
-        should_run_classifier = self._should_run_classifier(
-            q_norm=q_norm,
-            chat_session_id=chat_session_id,
-            has_structured_academic_intent=has_structured_academic_intent,
-            field=field,
-        )
 
         has_program_reference = self.has_program_mention(question)
 
@@ -835,7 +858,6 @@ class RAGPipeline:
             guard_reason=guard.reason,
             guard_detail=guard.detail,
             has_structured_academic_intent=has_structured_academic_intent,
-            should_run_classifier=should_run_classifier,
             has_program_reference=has_program_reference,
             can_use_memory_for_program_resolution=can_use_memory_for_program_resolution,
         )
@@ -863,6 +885,20 @@ class RAGPipeline:
                     "answer": "Por favor escribe tu pregunta.", "resolved": False}},
             )
 
+        # Detectar ruido / texto sin sentido antes de cualquier análisis semántico
+        if _is_noise_input(q_norm):
+            return self._return_no_llm(
+                chat_session_id,
+                question,
+                {"route": "NOT_FOUND", "data": {
+                    "message": (
+                        "No entendí tu mensaje. "
+                        "¿Tienes alguna pregunta sobre los programas de posgrado?"
+                    ),
+                    "resolved": False,
+                }},
+            )
+
         # Atajos triviales — antes de cualquier análisis semántico
         greetings = {"hola", "buenas", "hey", "hi", "buenos dias",
                      "buenas tardes", "buenas noches", "que tal"}
@@ -871,7 +907,7 @@ class RAGPipeline:
                                        {"route": "GREETING", "data": {"resolved": True}})
 
         # FIX H3: "gracias por la información" → THANKS (match por prefijo)
-        if q_norm in {"gracias", "muchas gracias", "thanks"} or q_norm.startswith("gracias"):
+        if q_norm in {"gracias", "muchas gracias", "gracias!", "gracias.", "thanks", "thank you"}:
             return self._return_no_llm(chat_session_id, question,
                                        {"route": "THANKS", "data": {"resolved": True}})
 
@@ -1010,23 +1046,10 @@ class RAGPipeline:
                 if maybe:
                     return self._return_no_llm(chat_session_id, question, maybe)
 
-        if analysis.should_run_classifier:
-            if not self.llm.classify_domain(question):
-                logger.info(
-                    "[CLASSIFIER] NOT_ACADEMIC. session=%s q=%r",
-                    chat_session_id, question[:60],
-                )
-                return self._return_no_llm(
-                    chat_session_id,
-                    question,
-                    {"route": "OUT_OF_DOMAIN", "data": {
-                        "answer": _OUT_OF_DOMAIN_MSG,
-                        "reason": "classifier",
-                        "resolved": True,
-                    }},
-                )
-
-        if self._looks_like_program_title(q_norm):
+        if (
+            not (analysis.is_listing and not analysis.is_false_listing)
+            and self._looks_like_program_title(q_norm)
+        ):
             maybe = self._try_set_active_program_from_title(
                 question, chat_session_id)
             if maybe:
@@ -1225,7 +1248,13 @@ class RAGPipeline:
         if analysis.recommendation_profile and not analysis.is_listing:
             profile = analysis.recommendation_profile
             all_programs = self.sql.list_programs_filtered(limit=100)
-            programs = self.llm.filter_programs_by_topic(all_programs, profile)
+
+            # 1. Embedding: rankea y reduce a los top-10 candidatos más cercanos
+            candidates = self._rank_programs_by_embedding(all_programs, profile, top_n=10)
+
+            # 2. LLM: selecciona los realmente relevantes del top-10
+            programs = self.llm.filter_programs_by_topic(candidates, profile)
+
             if programs:
                 if len(programs) == 1:
                     self._set_active_snies(
@@ -1401,7 +1430,15 @@ class RAGPipeline:
         if active_snies:
             active_program_id = self.sql._get_program_id_by_snies(active_snies)
 
-        if active_program_id:
+        # No anclar al programa activo si es pregunta sobre la institución en general
+        _is_institutional_q = (
+            not analysis.has_program_reference
+            and bool(re.search(
+                r"\b(en\s+la\s+universidad|de\s+la\s+universidad|la\s+universidad|en\s+la\s+usta)\b",
+                q_norm,
+            ))
+        )
+        if active_program_id and not _is_institutional_q:
             anchored = self.vector.semantic_search(
                 question,
                 sections=_DEFAULT_RAG_SECTIONS,
@@ -1464,6 +1501,7 @@ class RAGPipeline:
         # Si no hay programa activo en sesión, guardar el dominante de los resultados.
         # Esto habilita follow-ups ("¿cuántos créditos tiene?", "¿cuál es su horario?")
         # sin que el usuario tenga que repetir el nombre del programa.
+
         # Condiciones: el usuario mencionó un programa explícito (has_program_reference)
         # O el top result tiene alta similitud y al menos 2 chunks del mismo programa.
         if not active_snies and vec_ctx:

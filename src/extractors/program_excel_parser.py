@@ -1,26 +1,3 @@
-"""
-Parser de Excel de programas académicos
-=========================================
-CAMBIOS respecto a la versión anterior:
-
-  1. simple_chunk() → semantic_chunk()
-     Los chunks de narrativa respetan párrafos y tienen ventana de overlap
-     para no perder contexto en los bordes.
-
-  2. Anchors semánticos reforzados
-     Cada chunk de narrativa incluye SECTION_CONTEXT[section] para que el
-     modelo E5 distinga mejor entre secciones con vocabulario similar
-     (p.ej. perfil_egresado vs perfil_ocupacional).
-
-  3. Embeddings tabulares agrupados por semestre
-     En vez de 1 embedding por fila de MALLA_CURRICULAR, genera 1 embedding
-     por (programa, semestre). Reduce el índice de O(asignaturas) a
-     O(programas × semestres) y mejora la señal de similitud para preguntas
-     como "¿qué materias hay en tercer semestre?".
-
-  4. Sin cambios en la lógica SQL ni en el modelo de datos.
-"""
-
 import re
 import pandas as pd
 from itertools import groupby
