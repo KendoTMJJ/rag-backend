@@ -1,7 +1,7 @@
 import logging
 import threading
 from sqlalchemy.orm import Session
-from src.models.helpdesk import HelpdeskCategory
+from src.models.helpdesk import HelpdeskCategory, intent_to_display_label
 from src.services.llm_service import LLMService
 from src.prompts import HELPDESK_CLASSIFY, HELPDESK_ORIENTATION
 
@@ -135,10 +135,10 @@ class HelpdeskService:
         El LLM explica al usuario qué tipos de consultas puede manejar.
         Fallback: mensaje estático si el LLM falla o supera el timeout.
         """
-        rows = self.db.query(HelpdeskCategory.label).filter(
+        rows = self.db.query(HelpdeskCategory.intent).filter(
             HelpdeskCategory.intent.notin_(_RESERVED_INTENTS | _ALWAYS_VALID)
         ).all()
-        categories = ", ".join(r.label for r in rows) if rows else "trámites universitarios"
+        categories = ", ".join(intent_to_display_label(r.intent) for r in rows) if rows else "trámites universitarios"
 
         prompt = _ORIENTATION_PROMPT.format(
             question=(question or "")[:200],

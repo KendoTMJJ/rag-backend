@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.database.config import get_db
-from src.models.helpdesk import HelpdeskCategory
+from src.models.helpdesk import HelpdeskCategory, intent_to_display_label
 from src.services.helpdesk_service import HelpdeskService, _RESERVED_INTENTS, _ALWAYS_VALID
 from src.services.llm_service import LLMService
 from src.core.config import Config as settings
@@ -18,25 +18,31 @@ logger = logging.getLogger(__name__)
 
 _SALUDO_EXCLUDED = _RESERVED_INTENTS | _ALWAYS_VALID
 
-
-def _build_saludo_msg(db: Session) -> str:
-    rows = db.query(HelpdeskCategory.label).filter(
-        HelpdeskCategory.intent.notin_(_SALUDO_EXCLUDED)
-    ).all()
-    if rows:
-        labels = ", ".join(r.label for r in rows)
-        return (
-            f"¡Hola! Soy el asistente de la mesa de ayuda. "
-            f"Puedo orientarte con: {labels}. ¿En qué puedo ayudarte?"
-        )
-    return "¡Hola! Soy el asistente de la mesa de ayuda. ¿En qué puedo ayudarte?"
-
-# Instancia única igual que rag = RAGPipeline() en chat.py
 _llm = LLMService(
     base_url=settings.OLLAMA_BASE_URL,
     model=settings.OLLAMA_MODEL,
     temperature=0.0,
 )
+
+
+def _load_active_categories(db: Session) -> list[HelpdeskCategory]:
+    return (
+        db.query(HelpdeskCategory)
+        .filter(HelpdeskCategory.intent.notin_(_SALUDO_EXCLUDED))
+        .order_by(HelpdeskCategory.intent)
+        .all()
+    )
+
+
+def _build_saludo_msg(db: Session) -> str:
+    rows = _load_active_categories(db)
+    if rows:
+        labels = ", ".join(intent_to_display_label(r.intent) for r in rows)
+        return (
+            f"¡Hola! Soy el asistente de la mesa de ayuda. "
+            f"Puedo orientarte con: {labels}. ¿En qué puedo ayudarte?"
+        )
+    return "¡Hola! Soy el asistente de la mesa de ayuda. ¿En qué puedo ayudarte?"
 
 
 # ── Modelos ───────────────────────────────────────────────────────────────────
@@ -51,17 +57,31 @@ class ClassifyResponse(BaseModel):
     message: str | None = None
 
 
-class HelpdeskCategoryOut(BaseModel):
-    intent:      str
-    label:       str
-    pdf_url:     str | None
-    description: str | None
+class PublicCategoryOut(BaseModel):
+    intent:        str
+    display_label: str
+    description:   str | None
+    pdf_url:       str | None
 
     class Config:
         from_attributes = True
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.get("/categories", response_model=list[PublicCategoryOut])
+def list_categories_public(db: Session = Depends(get_db)):
+    rows = _load_active_categories(db)
+    return [
+        PublicCategoryOut(
+            intent=r.intent,
+            display_label=intent_to_display_label(r.intent),
+            description=r.description,
+            pdf_url=r.pdf_url,
+        )
+        for r in rows
+    ]
+
 
 @router.post("/classify", response_model=ClassifyResponse)
 def classify_intent(
@@ -94,7 +114,7 @@ def classify_intent(
     return ClassifyResponse(intent=intent)
 
 
-@router.get("/category/{intent}", response_model=HelpdeskCategoryOut)
+@router.get("/category/{intent}", response_model=PublicCategoryOut)
 def get_category(
     intent: str,
     db:     Session = Depends(get_db),
@@ -125,4 +145,9 @@ def get_category(
         "ms":     ms,
     }, ensure_ascii=False))
 
-    return row
+    return PublicCategoryOut(
+        intent=row.intent,
+        display_label=intent_to_display_label(row.intent),
+        description=row.description,
+        pdf_url=row.pdf_url,
+    )

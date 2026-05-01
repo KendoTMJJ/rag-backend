@@ -46,7 +46,7 @@ def list_categories(db: Session = Depends(get_db)):
         "count": len(rows),
         "ms":    ms,
     }))
-    return rows
+    return [HelpdeskCategoryOut.from_row(r) for r in rows]
 
 
 @router.get(
@@ -58,7 +58,7 @@ def get_category(id: int, db: Session = Depends(get_db)):
     row = db.query(HelpdeskCategory).filter(HelpdeskCategory.id == id).first()
     if not row:
         raise HTTPException(status_code=404, detail="No encontrado")
-    return row
+    return HelpdeskCategoryOut.from_row(row)
 
 
 @router.post(
@@ -68,20 +68,21 @@ def get_category(id: int, db: Session = Depends(get_db)):
     dependencies=[Depends(verify_internal_key)],
 )
 def create_category(body: HelpdeskCategoryCreate, db: Session = Depends(get_db)):
-    existing = (
-        db.query(HelpdeskCategory)
-        .filter(HelpdeskCategory.intent == body.intent)
-        .first()
-    )
+    intent = body.intent.strip().lower()
+    existing = db.query(HelpdeskCategory).filter(
+        HelpdeskCategory.intent == intent
+    ).first()
     if existing:
         raise HTTPException(
             status_code=409,
-            detail=f"Ya existe una categoría para intent='{body.intent}'",
+            detail=f"Ya existe una categoría para intent='{intent}'",
         )
 
     row = HelpdeskCategory(
-        **{**body.model_dump(), "intent": body.intent.lower()})
-
+        intent=intent,
+        description=body.description,
+        pdf_url=body.pdf_url,
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -92,7 +93,7 @@ def create_category(body: HelpdeskCategoryCreate, db: Session = Depends(get_db))
         "id":     row.id,
         "intent": row.intent,
     }))
-    return row
+    return HelpdeskCategoryOut.from_row(row)
 
 
 @router.patch(
@@ -117,7 +118,7 @@ def update_category(id: int, body: HelpdeskCategoryUpdate, db: Session = Depends
         "id":     row.id,
         "intent": row.intent,
     }))
-    return row
+    return HelpdeskCategoryOut.from_row(row)
 
 
 @router.delete(
@@ -138,21 +139,3 @@ def delete_category(id: int, db: Session = Depends(get_db)):
         "id": id,
     }))
     return {"deleted": id}
-
-
-@router.get(
-    "/intents",
-    dependencies=[Depends(verify_internal_key)],
-)
-def list_intents(db: Session = Depends(get_db)):
-    t0 = time.monotonic()
-    rows = db.query(HelpdeskCategory).order_by(HelpdeskCategory.intent).all()
-    ms = int((time.monotonic() - t0) * 1000)
-    result = [{"intent": r.intent, "label": r.label, "count": 1} for r in rows]
-    logger.info(json.dumps({
-        "ts":    datetime.now().isoformat(timespec="milliseconds"),
-        "op":    "list_intents",
-        "count": len(result),
-        "ms":    ms,
-    }))
-    return result
