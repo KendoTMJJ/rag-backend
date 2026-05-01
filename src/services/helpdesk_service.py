@@ -153,12 +153,14 @@ class HelpdeskService:
             },
             stop=["---"],
         )
+        fallback = (
+            f"No entendí tu consulta. Puedo orientarte con: {categories}. ¿En qué puedo ayudarte?"
+            if categories != "trámites universitarios"
+            else "No entendí tu consulta. ¿En qué puedo ayudarte?"
+        )
         return self.llm._call_with_timeout(
             lambda: getattr(llm_bound.invoke(prompt), "content", "").strip().strip('"\''),
             timeout=30.0,
             context="helpdesk.orientation",
-            fallback=(
-                "No entendí tu consulta. Puedes preguntarme sobre inscripciones, "
-                "fechas importantes, costos o requisitos de admisión."
-            ),
+            fallback=fallback,
         )

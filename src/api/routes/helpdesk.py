@@ -9,18 +9,27 @@ from sqlalchemy.orm import Session
 
 from src.database.config import get_db
 from src.models.helpdesk import HelpdeskCategory
-from src.services.helpdesk_service import HelpdeskService
+from src.services.helpdesk_service import HelpdeskService, _RESERVED_INTENTS, _ALWAYS_VALID
 from src.services.llm_service import LLMService
 from src.core.config import Config as settings
 
 router = APIRouter(prefix="/helpdesk", tags=["Helpdesk"])
 logger = logging.getLogger(__name__)
 
-_SALUDO_MSG = (
-    "¡Hola! Soy el asistente de la mesa de ayuda. "
-    "Puedes preguntarme sobre inscripciones, fechas importantes, "
-    "costos, requisitos de admisión o trámites académicos. ¿En qué puedo ayudarte?"
-)
+_SALUDO_EXCLUDED = _RESERVED_INTENTS | _ALWAYS_VALID
+
+
+def _build_saludo_msg(db: Session) -> str:
+    rows = db.query(HelpdeskCategory.label).filter(
+        HelpdeskCategory.intent.notin_(_SALUDO_EXCLUDED)
+    ).all()
+    if rows:
+        labels = ", ".join(r.label for r in rows)
+        return (
+            f"¡Hola! Soy el asistente de la mesa de ayuda. "
+            f"Puedo orientarte con: {labels}. ¿En qué puedo ayudarte?"
+        )
+    return "¡Hola! Soy el asistente de la mesa de ayuda. ¿En qué puedo ayudarte?"
 
 # Instancia única igual que rag = RAGPipeline() en chat.py
 _llm = LLMService(
@@ -79,7 +88,7 @@ def classify_intent(
 
     if intent == "saludo":
         logger.info(log_line)
-        return ClassifyResponse(intent=intent, message=_SALUDO_MSG)
+        return ClassifyResponse(intent=intent, message=_build_saludo_msg(db))
 
     logger.info(log_line)
     return ClassifyResponse(intent=intent)
