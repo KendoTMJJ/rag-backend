@@ -1,4 +1,4 @@
-# RAG Backend USTA
+# RAG Backend Santo Tomás Tunja
 
 Backend para un sistema de Recuperación Aumentada por Generación (RAG) orientado a programas académicos institucionales. Permite ingestar información desde archivos Excel, generar embeddings semánticos y exponerlos vía API REST.
 
