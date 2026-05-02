@@ -1,0 +1,546 @@
+[
+  {
+    "name": "OOD cost — comida clásica",
+    "session": "ood-cost-1",
+    "question": "Cuanto cuesta un pollo asado",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD cost — persona (hijo)",
+    "session": "ood-cost-2",
+    "question": "Cuanto cuesta un hijo",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD cost — persona con verbo",
+    "session": "ood-cost-3",
+    "question": "Cuanto cuesta mantener un hijo",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD cost — animal",
+    "session": "ood-cost-4",
+    "question": "Cuanto cuesta un perro de raza",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD cost — tecnología",
+    "session": "ood-cost-5",
+    "question": "Cuanto cuesta un iPhone 15",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD cost — comida con vale",
+    "session": "ood-cost-6",
+    "question": "Cuanto vale una pizza familiar",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD cost — finanzas personales",
+    "session": "ood-cost-7",
+    "question": "Cual es el precio del dólar hoy",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD cost — racista colombianismo",
+    "session": "ood-cost-8",
+    "question": "Cuanto cuesta un negro",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD cost — trata de personas",
+    "session": "ood-cost-9",
+    "question": "Cuanto cuesta exclavisar niños",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD cost — servicio no académico",
+    "session": "ood-cost-10",
+    "question": "Cuanto cuesta una consulta médica privada",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD duration — biológico",
+    "session": "ood-dur-1",
+    "question": "Cuanto dura un embarazo",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD duration — deporte",
+    "session": "ood-dur-2",
+    "question": "Cuanto dura el partido del domingo",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD duration — entretenimiento",
+    "session": "ood-dur-3",
+    "question": "Cuanto dura una película de Marvel",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD duration — racista con trigger académico",
+    "session": "ood-dur-4",
+    "question": "Cuanto dura comprar un negro",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD duration — semestres con objeto",
+    "session": "ood-dur-5",
+    "question": "Cuantos semestres dura cargar un iPhone",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD duration — relación amorosa",
+    "session": "ood-dur-6",
+    "question": "Cuanto dura una relación amorosa",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD credits — tarjeta bancaria",
+    "session": "ood-cred-1",
+    "question": "Cuantos créditos tiene mi tarjeta Visa",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD credits — streaming",
+    "session": "ood-cred-2",
+    "question": "Cuantos créditos me quedan en Netflix",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD credits — préstamo bancario",
+    "session": "ood-cred-3",
+    "question": "Cuantos créditos tiene un préstamo hipotecario",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD modality — partido deportivo",
+    "session": "ood-mod-1",
+    "question": "El partido de fútbol es presencial o virtual",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD modality — consulta médica",
+    "session": "ood-mod-2",
+    "question": "La consulta médica es presencial o virtual",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD modality — concierto",
+    "session": "ood-mod-3",
+    "question": "El concierto de Shakira es virtual o presencial",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD location — aeropuerto",
+    "session": "ood-loc-1",
+    "question": "Donde queda el aeropuerto de Tunja",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD location — laboral ofensivo",
+    "session": "ood-loc-2",
+    "question": "Donde consigo mano de obra barata",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD location — animales",
+    "session": "ood-loc-3",
+    "question": "Donde venden perros en Tunja",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD curriculum — colegio de bachillerato",
+    "session": "ood-curr-1",
+    "question": "Que materias tiene el colegio Boyacá",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD curriculum — primaria",
+    "session": "ood-curr-2",
+    "question": "Que materias ve un niño de primaria",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD curriculum — gastronomía",
+    "session": "ood-curr-3",
+    "question": "Que asignaturas tiene la cocina italiana",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD admission — ofensivo",
+    "session": "ood-adm-1",
+    "question": "Que perfil tiene un sicario",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD admission — deportivo",
+    "session": "ood-adm-2",
+    "question": "Que perfil necesita un futbolista profesional",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD degree options — colegio",
+    "session": "ood-deg-1",
+    "question": "Como me puedo graduar del colegio",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD degree options — metafórico",
+    "session": "ood-deg-2",
+    "question": "Como graduarse de la vida",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD inscription — otra institución",
+    "session": "ood-insc-1",
+    "question": "Como me inscribo al SENA",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD inscription — trámite no académico",
+    "session": "ood-insc-2",
+    "question": "Que documentos necesito para viajar a Europa",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD inscription — licencia conducción",
+    "session": "ood-insc-3",
+    "question": "Requisitos para sacar la licencia de conducción",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD inscription — trámite gubernamental",
+    "session": "ood-insc-4",
+    "question": "Como inscribirse en el SISBEN",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD minmax — racista con barato",
+    "session": "ood-mm-1",
+    "question": "Donde consigo niños negros baratos",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD minmax — sexual con barato",
+    "session": "ood-mm-2",
+    "question": "Donde consigo putas baratas en Tunja",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD minmax — restaurante más barato",
+    "session": "ood-mm-3",
+    "question": "Cual es el restaurante más barato de Tunja",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD minmax — vuelo económico",
+    "session": "ood-mm-4",
+    "question": "Cual es el vuelo más económico a Bogotá",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD occupational — oficio no académico",
+    "session": "ood-occ-1",
+    "question": "En que puedo trabajar si soy cocinero",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD occupational — nivel educativo incorrecto",
+    "session": "ood-occ-2",
+    "question": "Donde puedo trabajar con un título de bachiller",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD general — clima",
+    "session": "ood-gen-1",
+    "question": "Como está el clima en Tunja hoy",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD general — receta cocina",
+    "session": "ood-gen-2",
+    "question": "Como se hace un ajiaco bogotano",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD general — política",
+    "session": "ood-gen-3",
+    "question": "Quien ganó las últimas elecciones en Colombia",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD general — noticias",
+    "session": "ood-gen-4",
+    "question": "Que pasó ayer en Tunja",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "Setup sesión — seleccionar programa activo",
+    "session": "ood-with-memory",
+    "question": "snies 108827",
+    "expect": {
+      "route": "PROGRAM_SELECTED"
+    }
+  },
+  {
+    "name": "OOD con memoria — cost ofensivo",
+    "session": "ood-with-memory",
+    "question": "Cuanto cuesta exclavisar niños",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD con memoria — duration racista",
+    "session": "ood-with-memory",
+    "question": "Cuanto dura comprar un negro",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD con memoria — curriculum off-topic",
+    "session": "ood-with-memory",
+    "question": "Que materias ve un niño de primaria",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD con memoria — inscription otra institución",
+    "session": "ood-with-memory",
+    "question": "Como me inscribo al Ejército Nacional",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "OOD con memoria — mantener hijo (caso real fallido)",
+    "session": "ood-with-memory",
+    "question": "Cuanto cuesta mantener un hijo",
+    "expect": {
+      "route": "OUT_OF_DOMAIN"
+    }
+  },
+  {
+    "name": "ACADEMIC cost — maestría nombrada",
+    "session": "ac-cost-1",
+    "question": "Cuanto cuesta la maestría en administración",
+    "expectAny": {
+      "route": ["PROGRAM_FIELD", "NEED_PROGRAM", "NOT_FOUND"]
+    }
+  },
+  {
+    "name": "ACADEMIC cost — especialización nombrada",
+    "session": "ac-cost-2",
+    "question": "Cuanto vale la especialización en auditoría",
+    "expectAny": {
+      "route": ["PROGRAM_FIELD", "NEED_PROGRAM", "NOT_FOUND"]
+    }
+  },
+  {
+    "name": "ACADEMIC duration — doctorado nombrado",
+    "session": "ac-dur-1",
+    "question": "Cuanto dura el doctorado en bioética",
+    "expectAny": {
+      "route": ["PROGRAM_FIELD", "NEED_PROGRAM", "NOT_FOUND"]
+    }
+  },
+  {
+    "name": "ACADEMIC duration — pregunta corta con sesión",
+    "session": "ac-dur-2",
+    "question": "snies 108827",
+    "expect": {
+      "route": "PROGRAM_SELECTED"
+    }
+  },
+  {
+    "name": "ACADEMIC duration — seguimiento corto",
+    "session": "ac-dur-2",
+    "question": "Cuanto dura",
+    "expectAny": {
+      "route": ["PROGRAM_FIELD", "NOT_FOUND"]
+    }
+  },
+  {
+    "name": "ACADEMIC credits — con programa",
+    "session": "ac-cred-1",
+    "question": "Cuantos créditos tiene la especialización en sistemas",
+    "expectAny": {
+      "route": ["PROGRAM_FIELD", "NEED_PROGRAM", "NOT_FOUND"]
+    }
+  },
+  {
+    "name": "ACADEMIC modality — maestría presencial o virtual",
+    "session": "ac-mod-1",
+    "question": "La maestría en derecho es presencial o virtual",
+    "expectAny": {
+      "route": ["PROGRAM_FIELD", "NEED_PROGRAM", "NOT_FOUND"]
+    }
+  },
+  {
+    "name": "ACADEMIC inscription — con nombre de programa",
+    "session": "ac-insc-1",
+    "question": "Como me inscribo a la maestría en administración",
+    "expectAny": {
+      "route": [
+        "INSCRIPTION_LINK",
+        "INSCRIPTION_NEED_PROGRAM",
+        "INSCRIPTION_NO_LINK"
+      ]
+    }
+  },
+  {
+    "name": "ACADEMIC curriculum — malla con programa",
+    "session": "ac-curr-1",
+    "question": "Cual es la malla curricular de la maestría en sistemas",
+    "expectAny": {
+      "route": ["CURRICULUM", "NEED_PROGRAM", "NOT_FOUND"]
+    }
+  },
+  {
+    "name": "ACADEMIC degree options — con sesión",
+    "session": "ac-deg-1",
+    "question": "snies 108827",
+    "expect": {
+      "route": "PROGRAM_SELECTED"
+    }
+  },
+  {
+    "name": "ACADEMIC degree options — seguimiento con sesión",
+    "session": "ac-deg-1",
+    "question": "Como me puedo graduar",
+    "expectAny": {
+      "route": ["DEGREE_OPTIONS", "NOT_FOUND"]
+    }
+  },
+  {
+    "name": "ACADEMIC listing — programas de salud",
+    "session": "ac-list-1",
+    "question": "Que programas hay del area de salud",
+    "expectAny": {
+      "route": [
+        "LIST_PROGRAMS_FILTERED",
+        "LIST_PROGRAMS_FILTERED_EMPTY",
+        "LIST_PROGRAMS"
+      ]
+    }
+  },
+  {
+    "name": "ACADEMIC minmax — programa más económico",
+    "session": "ac-mm-1",
+    "question": "Cual es el programa de posgrado más económico",
+    "expectAny": {
+      "route": ["PROGRAM_MINMAX", "NOT_FOUND"]
+    }
+  },
+  {
+    "name": "ACADEMIC greeting — saludo (skip clasificador)",
+    "session": "ac-greet-1",
+    "question": "Hola",
+    "expect": {
+      "route": "GREETING"
+    }
+  },
+  {
+    "name": "ACADEMIC thanks — cierre (skip clasificador)",
+    "session": "ac-thanks-1",
+    "question": "Gracias",
+    "expect": {
+      "route": "THANKS"
+    }
+  }
+]

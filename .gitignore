@@ -1,7 +1,14 @@
+# Claude Code instructions (puede contener info local)
+CLAUDE.md
+.claude/
+
 # Entorno virtual
 .venv/
 venv/
 env/
+
+prueba.py
+
 
 # Variables de entorno (¡nunca subir!)
 .env
@@ -24,7 +31,6 @@ tmp/
 *.tmp
 
 # Modelos de ML descargados (pueden pesar GBs)
-models/
 *.bin
 *.safetensors
 *.onnx

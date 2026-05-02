@@ -1,5 +1,6 @@
+import threading
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from typing import List
+from typing import List, Optional
 import logging
 import torch
 from src.core.config import Config
@@ -50,3 +51,22 @@ class LocalEmbeddings:
 
     def embed_query(self, text: str) -> List[float]:
         return self.embeddings.embed_query(f"query: {text}")
+
+
+_lock: threading.Lock = threading.Lock()
+_instance: Optional[LocalEmbeddings] = None
+
+
+def get_embedding_model() -> LocalEmbeddings:
+    """Singleton del modelo de embeddings. Thread-safe (double-checked locking).
+
+    Carga el modelo la primera vez y reutiliza la misma instancia en llamadas
+    posteriores. Llamar desde startup garantiza que el primer request no pague
+    el costo de carga.
+    """
+    global _instance
+    if _instance is None:
+        with _lock:
+            if _instance is None:
+                _instance = LocalEmbeddings()
+    return _instance

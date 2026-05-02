@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Duración sin programa -> NEED_PROGRAM",
+    "session": "reg-field-dur-1",
+    "question": "¿Cuánto dura?",
+    "expect": { "route": "NEED_PROGRAM" }
+  },
+  {
+    "name": "Dar programa luego de pedir duracion",
+    "session": "reg-field-dur-1",
+    "question": "Maestria en ia",
+    "expectAny": { "route": ["PROGRAM_FIELD", "NOT_FOUND"] }
+  },
+  {
+    "name": "Default RAG pregunta tipo definición general -> DEFAULT_RAG o NOT_FOUND",
+    "session": "reg-def-2",
+    "question": "Cuentame sobre la maestria en salud publica",
+    "expectAny": { "route": ["DEFAULT_RAG", "NOT_FOUND"] }
+  },
+  {
+    "name": "Default RAG pregunta tipo perfil -> NARRATIVE_SQL o NOT_FOUND",
+    "session": "reg-def-2",
+    "question": "Cual es el perfil profesional",
+    "expectAny": { "route": ["NARRATIVE_SQL", "NOT_FOUND"] }
+  }
+]

@@ -9,12 +9,13 @@ class Config:
     # Ollama
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL")
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL")
-
     EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL")
 
-    # PostgreSql
-
+    # PostgreSQL
     POSTGRESQL_URL = os.getenv("POSTGRESQL_URL")
+
+    # Internal API Key (para rutas admin llamadas desde Chat Backend)
+    RAG_INTERNAL_API_KEY = os.getenv("RAG_INTERNAL_API_KEY")
 
 
 Config = Config()
