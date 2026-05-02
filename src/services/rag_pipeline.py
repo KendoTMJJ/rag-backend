@@ -1511,10 +1511,15 @@ class RAGPipeline:
                 _top_pid = _top.get("program_id")
                 _same_prog = sum(
                     1 for r in vec_ctx if r.get("program_id") == _top_pid)
+                # Solo fijar SNIES por similitud si el dominio fue confirmado
+                # (guard_reason != "unknown"). Con confianza baja solo se permite
+                # si el usuario mencionó explícitamente un programa, para evitar
+                # que texto sin sentido ancle la sesión a un programa arbitrario.
+                _domain_confirmed = analysis.guard_reason != "unknown"
                 if analysis.has_program_reference or (
-                    _top.get("similarity", 0) >= 0.72 and _same_prog >= 2
+                    _domain_confirmed and _top.get("similarity", 0) >= 0.72 and _same_prog >= 2
                 ) or (
-                    _top.get("similarity", 0) >= 0.78 and _same_prog >= 1
+                    _domain_confirmed and _top.get("similarity", 0) >= 0.78 and _same_prog >= 1
                 ):
                     self._set_active_snies(chat_session_id, _top_snies)
                     active_snies = _top_snies
