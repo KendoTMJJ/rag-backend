@@ -10,7 +10,7 @@ programas de posgrado de la Universidad Santo Tomás Seccional Tunja.
 - SQLAlchemy (ORM)
 - LangChain + Ollama (LLM local)
 - Modelo de embeddings: intfloat/multilingual-e5-base
-- Modelo LLM: qwen2.5:3b-instruct-q8_0
+- Modelo LLM: llama3.1:8b-instruct-q4_K_M
 
 ## Estructura clave
 - src/services/rag_pipeline.py     — Pipeline principal (rutas de decisión)
