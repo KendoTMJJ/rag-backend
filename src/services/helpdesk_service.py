@@ -1,8 +1,9 @@
 import logging
+import re
 import threading
 from sqlalchemy.orm import Session
 from src.models.helpdesk import HelpdeskCategory, intent_to_display_label
-from src.services.llm_service import LLMService
+from src.services.llm_service import LLMService, _log_tokens
 from src.prompts import HELPDESK_CLASSIFY, HELPDESK_ORIENTATION
 
 logger = logging.getLogger(__name__)
@@ -11,12 +12,43 @@ logger = logging.getLogger(__name__)
 _RESERVED_INTENTS = {"config", "fallback"}
 
 # Siempre presentes aunque no haya filas en la BD
-_ALWAYS_VALID = {"saludo", "desconocida"}
+_ALWAYS_VALID = {"saludo", "despedida", "desconocida"}
 
 _ALWAYS_VALID_DESCRIPTIONS: dict[str, str] = {
-    "saludo": "el usuario saluda o inicia la conversación (hola, buenos días, buenas tardes, etc.)",
-    "desconocida": "la consulta no encaja en ninguna categoría conocida",
+    "saludo": (
+        "el usuario saluda o inicia la conversación "
+        "(hola, buenos días, buenas tardes, buenas noches, ¿cómo estás?)"
+    ),
+    "despedida": (
+        "el usuario agradece, confirma o se despide de forma corta "
+        "(gracias, ok, entendido, listo, perfecto, excelente, hasta luego, de nada, "
+        "sí, no, claro, muy bien, bye, chao)"
+    ),
+    "desconocida": (
+        "la consulta no encaja en ninguna categoría universitaria, es texto sin sentido "
+        "o es ajena a los trámites de la institución"
+    ),
 }
+
+# ── Detección de ruido pre-LLM ────────────────────────────────────────────────
+
+_VOWELS = set("aeiouáéíóúü")
+_ONLY_NON_ALPHA = re.compile(r'^[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+$')
+
+
+def _is_noise(text: str) -> bool:
+    """True si el texto es muy probablemente entrada sin sentido (no llama al LLM)."""
+    t = text.strip()
+    if not t or len(t) == 1:
+        return True
+    # Solo dígitos y/o símbolos — sin ninguna letra
+    if _ONLY_NON_ALPHA.match(t):
+        return True
+    # Cualquier palabra de 5+ letras sin ninguna vocal → teclas aleatorias
+    for word in re.sub(r'[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]', ' ', t).split():
+        if len(word) >= 5 and not any(c.lower() in _VOWELS for c in word):
+            return True
+    return False
 
 _CLASSIFY_PROMPT_TEMPLATE = HELPDESK_CLASSIFY
 _ORIENTATION_PROMPT = HELPDESK_ORIENTATION
@@ -57,7 +89,7 @@ class HelpdeskService:
         Fallback (fail-closed): si el LLM falla → 'desconocida'.
         """
         question = (question or "").strip()
-        if not question:
+        if not question or _is_noise(question):
             return "desconocida"
 
         valid_intents = self._load_valid_intents()
@@ -87,6 +119,7 @@ class HelpdeskService:
             def _call():
                 try:
                     r = llm_bound.invoke(prompt_text)
+                    _log_tokens("helpdesk_classify", r)
                     result_holder.append(
                         getattr(r, "content", str(r)).strip().lower()
                     )
@@ -158,8 +191,13 @@ class HelpdeskService:
             if categories != "trámites universitarios"
             else "No entendí tu consulta. ¿En qué puedo ayudarte?"
         )
+        def _invoke():
+            r = llm_bound.invoke(prompt)
+            _log_tokens("helpdesk_orientation", r)
+            return getattr(r, "content", "").strip().strip('"\'')
+
         return self.llm._call_with_timeout(
-            lambda: getattr(llm_bound.invoke(prompt), "content", "").strip().strip('"\''),
+            _invoke,
             timeout=30.0,
             context="helpdesk.orientation",
             fallback=fallback,

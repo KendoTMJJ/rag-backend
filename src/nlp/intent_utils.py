@@ -30,6 +30,8 @@ _OVERVIEW_TRIGGERS = {
     "info del programa", "informacion del programa",
     "sobre el programa", "acerca del programa", "acerca de",
     "puedes describir", "resumen rapido", "dame un resumen",
+    "darme un resumen", "me des un resumen", "puedes darme un resumen",
+    "me puedes dar un resumen", "quiero un resumen", "necesito un resumen",
     "cual es el enfoque", "enfoque del posgrado", "enfoque del programa",
     "que se aprende en", "que ensenan", "que se aprende",
     "cuentame del programa", "presentame el programa",
@@ -428,7 +430,7 @@ def detect_field(q_norm: str) -> Optional[str]:
         return "cost"
 
     # ── MODALITY ─────────────────────────────────────────────────────────────
-    if re.search(r"\bmodalidades?\b", q):
+    if re.search(r"\bmodalidad(?:es)?\b", q):
         return "modality"
     if re.search(r"\b(presencial|virtual|semipresencial|a\s+distancia|hibrido|hibrida)\b", q):
         return "modality"

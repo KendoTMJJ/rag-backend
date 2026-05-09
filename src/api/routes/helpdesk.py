@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -23,6 +24,14 @@ _llm = LLMService(
     model=settings.OLLAMA_MODEL,
     temperature=0.0,
 )
+
+_MIME_TYPES: dict[str, str] = {
+    "pdf":  "application/pdf",
+    "ppt":  "application/vnd.ms-powerpoint",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "doc":  "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
 
 
 def _load_active_categories(db: Session) -> list[HelpdeskCategory]:
@@ -61,10 +70,27 @@ class PublicCategoryOut(BaseModel):
     intent:        str
     display_label: str
     description:   str | None
-    pdf_url:       str | None
+    has_document:  bool
+    document_url:  str | None
+    pdf_url:       str | None  # alias para compatibilidad con n8n
 
     class Config:
         from_attributes = True
+
+
+def _public_out(r: HelpdeskCategory) -> PublicCategoryOut:
+    has_doc = bool(r.document_data)
+    relative = f"/helpdesk/document/{r.intent}" if has_doc else None
+    base = settings.PUBLIC_BASE_URL
+    absolute = f"{base}{relative}" if relative and base else relative
+    return PublicCategoryOut(
+        intent=r.intent,
+        display_label=intent_to_display_label(r.intent),
+        description=r.description,
+        has_document=has_doc,
+        document_url=absolute,
+        pdf_url=absolute,
+    )
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -72,15 +98,7 @@ class PublicCategoryOut(BaseModel):
 @router.get("/categories", response_model=list[PublicCategoryOut])
 def list_categories_public(db: Session = Depends(get_db)):
     rows = _load_active_categories(db)
-    return [
-        PublicCategoryOut(
-            intent=r.intent,
-            display_label=intent_to_display_label(r.intent),
-            description=r.description,
-            pdf_url=r.pdf_url,
-        )
-        for r in rows
-    ]
+    return [_public_out(r) for r in rows]
 
 
 @router.post("/classify", response_model=ClassifyResponse)
@@ -109,6 +127,13 @@ def classify_intent(
     if intent == "saludo":
         logger.info(log_line)
         return ClassifyResponse(intent=intent, message=_build_saludo_msg(db))
+
+    if intent == "despedida":
+        logger.info(log_line)
+        return ClassifyResponse(
+            intent="saludo",
+            message="¡De nada! Si tienes otra consulta, aquí estoy para ayudarte. 😊",
+        )
 
     logger.info(log_line)
     return ClassifyResponse(intent=intent)
@@ -145,9 +170,33 @@ def get_category(
         "ms":     ms,
     }, ensure_ascii=False))
 
-    return PublicCategoryOut(
-        intent=row.intent,
-        display_label=intent_to_display_label(row.intent),
-        description=row.description,
-        pdf_url=row.pdf_url,
+    return _public_out(row)
+
+
+@router.get("/document/{intent}")
+def download_document(intent: str, db: Session = Depends(get_db)):
+    row = (
+        db.query(HelpdeskCategory)
+        .filter(HelpdeskCategory.intent == intent.lower())
+        .first()
+    )
+    if not row or not row.document_data:
+        raise HTTPException(status_code=404, detail="Documento no disponible")
+
+    filename = row.document_filename or f"{intent}.bin"
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    content_type = _MIME_TYPES.get(ext, "application/octet-stream")
+
+    logger.info(json.dumps({
+        "ts":       datetime.now().isoformat(timespec="milliseconds"),
+        "op":       "download_document",
+        "intent":   intent,
+        "filename": filename,
+        "bytes":    len(row.document_data),
+    }))
+
+    return Response(
+        content=row.document_data,
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )

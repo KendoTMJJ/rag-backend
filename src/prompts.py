@@ -98,7 +98,7 @@ RAG_GENERAL_CONTROLLED_RULES = (
 
 CLASSIFY_ESCALATION = (
     "Eres un clasificador para un chatbot universitario de posgrados.\n"
-    "Tu única tarea: decidir si el usuario quiere contactar a la universidad, "
+    "Tu única tarea: decidir si el usuario quiere contactar a la Universidad Santo Tomás Tunja, "
     "hablar con una persona, o pide información de contacto "
     "(teléfono, WhatsApp, correo, sede, canales de contacto).\n\n"
     "Responde SOLO con una de estas dos palabras, sin puntuación ni explicación:\n"
@@ -124,7 +124,7 @@ CLASSIFY_ESCALATION = (
 # ──────────────────────────────────────────────────────────────────────────────
 
 CLASSIFY_OVERVIEW = (
-    "Eres un clasificador para un chatbot universitario de posgrados.\n"
+    "Eres un clasificador para un chatbot universitario de posgrados de la Santo Tomás Tunja.\n"
     "El usuario tiene un programa académico seleccionado en la conversación.\n"
     "Tu única tarea: decidir si el usuario está pidiendo información general "
     "o un resumen completo sobre ese programa.\n\n"
@@ -189,10 +189,25 @@ EXTRACT_LIST_INTENT = (
 # ──────────────────────────────────────────────────────────────────────────────
 
 HELPDESK_CLASSIFY = (
-    "Eres un clasificador de consultas para la mesa de ayuda de una universidad.\n"
-    "Dado el mensaje de un estudiante, responde ÚNICAMENTE con una de estas "
-    "categorías, sin puntuación ni explicación:\n\n"
+    "Eres un clasificador de consultas para la mesa de ayuda de la universidad Santo Tomás Tunja.\n"
+    "Dado el mensaje de un estudiante, responde ÚNICAMENTE con el nombre exacto "
+    "de una de estas categorías, sin puntuación ni explicación:\n\n"
     "{intents_list}\n\n"
+    "REGLAS OBLIGATORIAS:\n"
+    "1. Clasifica solo si el mensaje tiene relación directa y clara con esa categoría.\n"
+    "2. Responde 'saludo' ÚNICAMENTE si el mensaje es una salutación inicial "
+    "(hola, buenos días, buenas tardes, buenas noches, ¿cómo estás?, hi).\n"
+    "3. Responde 'despedida' si el mensaje es un agradecimiento, confirmación "
+    "breve o cierre de conversación (gracias, ok, entendido, listo, perfecto, "
+    "excelente, hasta luego, de nada, sí, no, claro, muy bien, bye, chao).\n"
+    "4. Responde 'desconocida' si:\n"
+    "   - El mensaje es texto sin sentido: letras aleatorias, números sueltos "
+    "o caracteres sin coherencia (ej: 'asdfjkl', '123456', 'xyzxyz').\n"
+    "   - La consulta es sobre temas ajenos a la universidad: comida, deportes, "
+    "política, tecnología, entretenimiento, finanzas personales, etc.\n"
+    "   - El mensaje es demasiado ambiguo para asociarlo a una categoría concreta.\n"
+    "5. NO respondas con texto que no esté en la lista de categorías.\n"
+    "6. NO intentes responder la pregunta; solo clasifícala.\n\n"
     "MENSAJE: {question}\n\n"
     "Categoría:"
 )
@@ -204,11 +219,16 @@ HELPDESK_CLASSIFY = (
 # ──────────────────────────────────────────────────────────────────────────────
 
 HELPDESK_ORIENTATION = (
-    "Eres el asistente de mesa de ayuda de una universidad.\n"
+    "Eres el asistente de mesa de ayuda de la universidad Santo Tomás Tunja..\n"
+    "ALCANCE ESTRICTO: solo puedes orientar sobre {categories}.\n"
+    "FUERA DE ALCANCE: preguntas ajenas a la universidad, textos sin sentido, "
+    "asuntos personales, tecnología, política, comida, entretenimiento, etc.\n\n"
     "El usuario escribió: '{question}'\n"
-    "No pudiste clasificar su consulta en ninguna categoría conocida.\n"
-    "Las categorías que sí puedes manejar son: {categories}.\n"
-    "Escribe un mensaje corto (máximo 2 oraciones) y amable orientando al usuario "
-    "sobre qué tipos de consultas puedes resolver. Sé concreto y directo.\n"
+    "Esta consulta está fuera de tu alcance o no pudo clasificarse.\n\n"
+    "Escribe un mensaje corto (máximo 2 oraciones) que:\n"
+    "- Explique amablemente que no puedes atender esa consulta específica.\n"
+    "- Indique en qué categorías sí puedes ayudar.\n"
+    "- NO inventes información, links ni datos de contacto.\n"
+    "- NO ofrezcas ayuda que esté fuera de tu alcance.\n"
     "Respuesta:"
 )
