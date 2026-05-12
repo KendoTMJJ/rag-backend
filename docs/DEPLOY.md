@@ -128,15 +128,26 @@ PUBLIC_BASE_URL=https://tudominio.com/api/rag
 CATALOG_POSGRADOS_URL=https://santotovirtual.edu.co/
 
 # ── Chat Backend (NestJS) ────────────────────────────────────────────────────
-RAG_URL=http://rag-backend:8000
-JWT_SECRET=CAMBIA_ESTO_jwt_secret_muy_largo_y_aleatorio
+# Modo de ejecución — CRÍTICO: sin esto los logs DEBUG aparecen en producción
+NODE_ENV=production
 
-# Cuenta administrador inicial (se crea al arrancar)
+# URL del RAG backend accesible desde el contenedor del chat
+RAG_BASE_URL=http://rag-backend:8000
+RAG_INTERNAL_API_KEY=CAMBIA_ESTO_clave_interna_muy_larga   # misma que RAG_INTERNAL_API_KEY del rag-backend
+
+JWT_SECRET=CAMBIA_ESTO_jwt_secret_muy_largo_y_aleatorio
+JWT_EXPIRES_IN=12h
+
+# Cuenta administrador inicial (se crea al arrancar por primera vez)
 ADMIN_EMAIL=admin@tudominio.com
-ADMIN_PASSWORD=CAMBIA_ESTO_admin_password_seguro
+ADMIN_INITIAL_PASSWORD=CAMBIA_ESTO_admin_password_seguro
+ADMIN_NAME=Administrador
+
+# URL del frontend — usada para CORS y para construir el enlace de recuperación de contraseña
+FRONTEND_URL=https://tudominio.com
 
 # URL pública del chat backend
-PUBLIC_BASE_URL_CHAT=https://tudominio.com/api/chat
+PUBLIC_BASE_URL=https://tudominio.com/api/chat
 
 # ── n8n ──────────────────────────────────────────────────────────────────────
 # Configurar DESPUÉS de que n8n esté corriendo y tengas el webhook URL real
@@ -145,8 +156,10 @@ N8N_WEBHOOK_URL=https://tudominio.com/n8n/webhook/TU_WEBHOOK_ID
 # ── SMTP (notificaciones por correo) ────────────────────────────────────────
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
+SMTP_SECURE=false
 SMTP_USER=correo@tudominio.com
-SMTP_PASSWORD=CAMBIA_ESTO_password_smtp
+SMTP_PASS=CAMBIA_ESTO_password_smtp
+SMTP_FROM=no-reply@tudominio.com
 
 # ── Chat Frontend (React) ────────────────────────────────────────────────────
 # Esta variable se BAKE en la imagen al hacer build — debe apuntar al chat backend
@@ -477,3 +490,7 @@ crontab -e
 | Chat no recibe respuesta de n8n | `N8N_WEBHOOK_URL` incorrecto o n8n inactivo | Verificar URL del webhook y que el workflow esté activado |
 | Primer arranque muy lento | RAG descarga ~550 MB del modelo de embeddings | Normal, ocurre solo la primera vez |
 | Error `pgvector` al iniciar RAG | Extensión vector no instalada en la BD | `docker compose exec postgres-rag psql -U rag_user -d rag_db -c "CREATE EXTENSION IF NOT EXISTS vector;"` |
+| Logs `DEBUG` visibles en producción | `NODE_ENV=production` no definido en `.env` | Agregar `NODE_ENV=production` al `.env` y reiniciar: `docker compose restart chat-backend` |
+| Error CORS en el frontend al conectar con el chat | `FRONTEND_URL` no definido o apunta al dominio incorrecto | Verificar que `FRONTEND_URL=https://tudominio.com` esté en `.env` y coinicida exactamente con el origen del navegador |
+| Admin inicial no se crea al arrancar | Variable incorrecta: `ADMIN_PASSWORD` en vez de `ADMIN_INITIAL_PASSWORD` | Renombrar la variable en `.env` y reiniciar: `docker compose restart chat-backend` |
+| SMTP no envía correos (recuperación de contraseña) | Variable `SMTP_PASSWORD` en vez de `SMTP_PASS` | Renombrar la variable en `.env`; en modo dev el enlace aparece en los logs del contenedor |
