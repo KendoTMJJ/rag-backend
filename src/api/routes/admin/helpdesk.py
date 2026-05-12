@@ -3,7 +3,7 @@ import logging
 import time
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from src.core.config import Config
@@ -18,6 +18,7 @@ from src.api.schemas.helpdesk import (
 router = APIRouter(prefix="/helpdesk/admin", tags=["Helpdesk Admin"])
 logger = logging.getLogger(__name__)
 
+_MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,6 @@ def create_category(body: HelpdeskCategoryCreate, db: Session = Depends(get_db))
     row = HelpdeskCategory(
         intent=intent,
         description=body.description,
-        pdf_url=body.pdf_url,
     )
     db.add(row)
     db.commit()
@@ -139,3 +139,64 @@ def delete_category(id: int, db: Session = Depends(get_db)):
         "id": id,
     }))
     return {"deleted": id}
+
+
+@router.post(
+    "/categories/{id}/document",
+    response_model=HelpdeskCategoryOut,
+    dependencies=[Depends(verify_internal_key)],
+)
+async def upload_document(
+    id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    row = db.query(HelpdeskCategory).filter(HelpdeskCategory.id == id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="No encontrado")
+
+    data = await file.read()
+    if len(data) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"El archivo supera el límite de {_MAX_UPLOAD_BYTES // (1024*1024)} MB",
+        )
+
+    row.document_data = data
+    row.document_filename = file.filename
+    db.commit()
+    db.refresh(row)
+
+    logger.info(json.dumps({
+        "ts":       datetime.now().isoformat(timespec="milliseconds"),
+        "op":       "upload_document",
+        "id":       row.id,
+        "intent":   row.intent,
+        "filename": file.filename,
+        "bytes":    len(data),
+    }))
+    return HelpdeskCategoryOut.from_row(row)
+
+
+@router.delete(
+    "/categories/{id}/document",
+    response_model=HelpdeskCategoryOut,
+    dependencies=[Depends(verify_internal_key)],
+)
+def delete_document(id: int, db: Session = Depends(get_db)):
+    row = db.query(HelpdeskCategory).filter(HelpdeskCategory.id == id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="No encontrado")
+
+    row.document_data = None
+    row.document_filename = None
+    db.commit()
+    db.refresh(row)
+
+    logger.info(json.dumps({
+        "ts":     datetime.now().isoformat(timespec="milliseconds"),
+        "op":     "delete_document",
+        "id":     row.id,
+        "intent": row.intent,
+    }))
+    return HelpdeskCategoryOut.from_row(row)

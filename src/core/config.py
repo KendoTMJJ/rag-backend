@@ -17,5 +17,8 @@ class Config:
     # Internal API Key (para rutas admin llamadas desde Chat Backend)
     RAG_INTERNAL_API_KEY = os.getenv("RAG_INTERNAL_API_KEY")
 
+    # URL pública base del backend RAG (usada para construir enlaces de descarga)
+    PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+
 
 Config = Config()

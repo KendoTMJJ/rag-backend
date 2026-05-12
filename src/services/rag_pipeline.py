@@ -210,7 +210,7 @@ class RAGPipeline:
         )
         self.catalog_url = os.getenv(
             "CATALOG_POSGRADOS_URL",
-            "https://santototunja.edu.co/programas-academicos/programas/posgrados-presenciales",
+            "https://santotovirtual.edu.co/",
         )
         self._program_vocab: frozenset = self._build_program_vocab()
 
@@ -509,7 +509,8 @@ class RAGPipeline:
             )
             return [p for p, _ in ranked[:top_n]]
         except Exception as exc:
-            logger.warning("[embedding_rank] Error: %s. Usando lista completa.", exc)
+            logger.warning(
+                "[embedding_rank] Error: %s. Usando lista completa.", exc)
             return programs
 
     def _looks_like_program_title(self, q_norm: str) -> bool:
@@ -793,7 +794,8 @@ class RAGPipeline:
         ):
             is_overview = self.llm.classify_overview(question)
             if is_overview:
-                logger.debug("[ANALYZE] classify_overview LLM → OVERVIEW for q=%r", q_norm[:60])
+                logger.debug(
+                    "[ANALYZE] classify_overview LLM → OVERVIEW for q=%r", q_norm[:60])
 
         topic = extract_topic_for_listing(question) if (
             is_listing and field is None) else None
@@ -1104,10 +1106,16 @@ class RAGPipeline:
                                        {"route": "NARRATIVE_SQL", "data": {"snies": snies, "source": source, "field": narr_field, "text": text, "resolved": True}})
 
         if analysis.is_overview:
+            # Para overview, si ya hay SNIES activo en sesión siempre usar memoria,
+            # independientemente de la longitud de la pregunta.
+            _allow_memory_ov = (
+                analysis.can_use_memory_for_program_resolution
+                or bool(self._get_active_snies(chat_session_id))
+            )
             snies, source = self._ensure_program(
                 question, chat_session_id,
                 allow_embedding=analysis.has_program_reference,
-                allow_memory_fallback=analysis.can_use_memory_for_program_resolution,
+                allow_memory_fallback=_allow_memory_ov,
                 min_sim_embedding=PROGRAM_RESOLVE_MIN_SIM["default"],
             )
             if not snies:
@@ -1250,7 +1258,8 @@ class RAGPipeline:
             all_programs = self.sql.list_programs_filtered(limit=100)
 
             # 1. Embedding: rankea y reduce a los top-10 candidatos más cercanos
-            candidates = self._rank_programs_by_embedding(all_programs, profile, top_n=10)
+            candidates = self._rank_programs_by_embedding(
+                all_programs, profile, top_n=10)
 
             # 2. LLM: selecciona los realmente relevantes del top-10
             programs = self.llm.filter_programs_by_topic(candidates, profile)
@@ -1517,9 +1526,11 @@ class RAGPipeline:
                 # que texto sin sentido ancle la sesión a un programa arbitrario.
                 _domain_confirmed = analysis.guard_reason != "unknown"
                 if analysis.has_program_reference or (
-                    _domain_confirmed and _top.get("similarity", 0) >= 0.72 and _same_prog >= 2
+                    _domain_confirmed and _top.get(
+                        "similarity", 0) >= 0.72 and _same_prog >= 2
                 ) or (
-                    _domain_confirmed and _top.get("similarity", 0) >= 0.78 and _same_prog >= 1
+                    _domain_confirmed and _top.get(
+                        "similarity", 0) >= 0.78 and _same_prog >= 1
                 ):
                     self._set_active_snies(chat_session_id, _top_snies)
                     active_snies = _top_snies

@@ -1,3 +1,4 @@
+import json
 import os as _os
 import logging
 import re
@@ -20,7 +21,24 @@ from src.prompts import (
 )
 
 logger = logging.getLogger(__name__)
+_token_logger = logging.getLogger("rag.tokens")
 Message = Dict[str, str]
+
+
+def _log_tokens(op: str, response, session_id: str = "", model: str = "") -> None:
+    """Extrae y loguea el uso de tokens de una respuesta de Ollama/LangChain."""
+    meta  = getattr(response, "response_metadata", {}) or {}
+    usage = getattr(response, "usage_metadata",    {}) or {}
+    prompt_tokens     = meta.get("prompt_eval_count") or usage.get("input_tokens")  or 0
+    completion_tokens = meta.get("eval_count")        or usage.get("output_tokens") or 0
+    _token_logger.info(json.dumps({
+        "op":                op,
+        "session":           session_id[:12] if session_id else "",
+        "prompt_tokens":     prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "total_tokens":      prompt_tokens + completion_tokens,
+        "model":             model,
+    }, ensure_ascii=False))
 
 
 # ──────────────────────────────────────────────────────────────
@@ -374,6 +392,7 @@ class LLMService:
         try:
             def _invoke():
                 r = llm_bound.invoke(prompt_text)
+                _log_tokens("classify_escalation", r, model=self.model)
                 return getattr(r, "content", str(r)).strip().upper()
 
             answer = self._call_with_timeout(
@@ -420,6 +439,7 @@ class LLMService:
         try:
             def _invoke():
                 r = llm_bound.invoke(prompt_text)
+                _log_tokens("classify_overview", r, model=self.model)
                 return getattr(r, "content", str(r)).strip().upper()
 
             answer = self._call_with_timeout(
@@ -467,6 +487,7 @@ class LLMService:
                     {"context": context, "question": question, "style_hint": style_hint},
                     config=config,
                 )
+                _log_tokens("generate", r, session_id=chat_session_id, model=self.model)
                 return topics_cleanup(getattr(r, "content", str(r)))
 
             return self._call_with_timeout(
@@ -500,6 +521,7 @@ class LLMService:
                     {"context": context, "question": question},
                     config=config,
                 )
+                _log_tokens("generate_general", r, session_id=chat_session_id, model=self.model)
                 return topics_cleanup(getattr(r, "content", str(r)))
 
             return self._call_with_timeout(
@@ -558,6 +580,7 @@ class LLMService:
         try:
             def _invoke():
                 r = llm_bound.invoke(prompt_text)
+                _log_tokens("filter_programs", r, model=self.model)
                 return getattr(r, "content", str(r)).strip()
 
             answer = self._call_with_timeout(
@@ -614,6 +637,7 @@ class LLMService:
         )
         try:
             result = llm_bound.invoke(extractor_prompt)
+            _log_tokens("extract_list_intent", result, model=self.model)
             text = getattr(result, "content", str(result)).strip()
         except Exception as e:
             logger.error(
